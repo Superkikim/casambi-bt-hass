@@ -1,3 +1,5 @@
+TEST MODE
+
 # Home Assistant integration for Casambi using Bluetooth
 
 [![Discord](https://img.shields.io/discord/1186445089317326888)](https://discord.gg/jgZVugfx)

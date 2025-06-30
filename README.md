@@ -137,6 +137,7 @@ Functionality exposed to HA:
 - Lights
 - Light groups
 - Scenes
+- Switches* (not as Home Assistant switch entities - but switch events are published as `casambi_bt_switch_event`)
 
 Supported control types:
 - Dimmer
@@ -147,7 +148,6 @@ Supported control types:
 - Vertical
 
 Not supported yet:
-- Switches (as Home Assistant switch entities - but switch events are published to MQTT)
 - Sensors
 - Additional control types (e.g. temperature, ...)
 - Networks with classic firmware

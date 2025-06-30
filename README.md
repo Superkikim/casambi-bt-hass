@@ -3,27 +3,43 @@
 This is an enhanced version of the original Casambi Bluetooth integration with the following improvements:
 
 - **Fixed relay status** - Properly reports the status of relay units
-- **Switch event support via MQTT (Optional)** - Physical switch/button press events are published to MQTT
+- **Switch event support** - Physical switch/button press events are fired as Home Assistant events for automations
 - **Based on modified casambi-bt library** - Uses an enhanced version of the underlying library for better device support
 
 ## Switch Event Support
 
-When MQTT is configured in Home Assistant, switch button press/release events are automatically published to MQTT topics:
-- Individual button events: `casambi_bt/switch/{entry_id}/{unit_id}/button_{button_number}`
-- All events stream: `casambi_bt/switch/{entry_id}/events`
+Switch button press/release events are fired as Home Assistant events that can be used in automations.
 
-Event payload includes:
-```json
-{
-  "unit_id": "123",
-  "button": 1,
-  "event": "button_press",
-  "action": "press",
-  "timestamp": "2024-01-01T12:00:00+00:00"
-}
+### Event Details
+- **Event Type**: `casambi_bt_switch_event`
+- **Event Data**:
+  - `entry_id`: The config entry ID
+  - `unit_id`: The Casambi unit ID that sent the event
+  - `button`: Button number (0-based)
+  - `action`: Either "button_press" or "button_release"
+  - `message_type`: Raw message type from the device
+  - `flags`: Additional flags from the message
+
+### Example Automation
+
+```yaml
+automation:
+  - alias: "Casambi Switch Button Press"
+    trigger:
+      - platform: event
+        event_type: casambi_bt_switch_event
+        event_data:
+          unit_id: 123  # Your switch unit ID
+          button: 0     # Button number
+          action: "button_press"
+    action:
+      - service: light.toggle
+        target:
+          entity_id: light.living_room
 ```
 
-Note: MQTT is optional. If not configured, the integration works normally without publishing switch events.
+### Listening to Events
+You can monitor these events in Developer Tools → Events → Listen to events by entering `casambi_bt_switch_event` as the event type.
 
 # Home Assistant integration for Casambi using Bluetooth
 

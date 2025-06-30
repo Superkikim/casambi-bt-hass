@@ -23,7 +23,6 @@ from homeassistant.exceptions import (
 from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import DOMAIN, PLATFORMS
-from .mqtt_handler import CasambiMQTTHandler
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -46,27 +45,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api = CasambiApi(hass, entry, entry.data[CONF_ADDRESS], entry.data[CONF_PASSWORD])
     await api.connect()
     
-    # Set up MQTT handler for switch events (optional)
-    mqtt_handler = None
-    try:
-        # Check if MQTT is available through hass.components
-        if hasattr(hass.components, 'mqtt'):
-            mqtt_handler = CasambiMQTTHandler(hass, entry.entry_id)
-            if mqtt_handler.is_available():
-                api.register_switch_event_callback(mqtt_handler.publish_switch_event)
-                _LOGGER.info("MQTT handler registered for switch events")
-            else:
-                _LOGGER.info("MQTT client not available, switch events will not be published to MQTT")
-        else:
-            _LOGGER.info("MQTT integration not loaded in Home Assistant")
-    except Exception as e:
-        _LOGGER.exception(f"Error setting up MQTT handler: {e}")
-        mqtt_handler = None
+    # Register switch event handler that fires Home Assistant events
+    def handle_switch_event(event_data: dict) -> None:
+        """Fire a Home Assistant event when a switch is pressed/released."""
+        hass.bus.async_fire(
+            f"{DOMAIN}_switch_event",
+            {
+                "entry_id": entry.entry_id,
+                "unit_id": event_data.get("unit_id"),
+                "button": event_data.get("button"),
+                "action": event_data.get("event"),  # "button_press" or "button_release"
+                "message_type": event_data.get("message_type"),
+                "flags": event_data.get("flags"),
+            }
+        )
+        _LOGGER.debug(
+            f"Fired {DOMAIN}_switch_event for unit {event_data.get('unit_id')} "
+            f"button {event_data.get('button')} - {event_data.get('event')}"
+        )
     
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
-        "api": api,
-        "mqtt_handler": mqtt_handler,
-    }
+    # Register the event handler if the library supports it
+    if hasattr(api.casa, 'registerSwitchEventHandler'):
+        api.register_switch_event_callback(handle_switch_event)
+        _LOGGER.info("Switch event handler registered - events will fire as casambi_bt_switch_event")
+    
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = api
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -77,14 +80,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
-    data = hass.data[DOMAIN][entry.entry_id]
-    casa_api: CasambiApi = data["api"]
-    mqtt_handler: CasambiMQTTHandler = data["mqtt_handler"]
-    
-    # Unregister MQTT handler if available
-    if mqtt_handler and mqtt_handler.is_available():
-        casa_api.unregister_switch_event_callback(mqtt_handler.publish_switch_event)
-    
+    casa_api: CasambiApi = hass.data[DOMAIN][entry.entry_id]
     await casa_api.disconnect()
 
     if unload_ok:

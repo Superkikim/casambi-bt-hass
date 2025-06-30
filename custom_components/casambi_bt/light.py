@@ -49,7 +49,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Create the Casambi light entities."""
-    casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]["api"]
+    casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
 
     light_entities: list[CasambiLight] = [
         CasambiLightUnit(casa_api, u) for u in casa_api.get_units(CASA_LIGHT_CTRL_TYPES)

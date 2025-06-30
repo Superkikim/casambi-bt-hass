@@ -1,4 +1,29 @@
-TEST MODE
+# What's revamped?
+
+This is an enhanced version of the original Casambi Bluetooth integration with the following improvements:
+
+- **Fixed relay status** - Properly reports the status of relay units
+- **Switch event support via MQTT (Optional)** - Physical switch/button press events are published to MQTT
+- **Based on modified casambi-bt library** - Uses an enhanced version of the underlying library for better device support
+
+## Switch Event Support
+
+When MQTT is configured in Home Assistant, switch button press/release events are automatically published to MQTT topics:
+- Individual button events: `casambi_bt/switch/{entry_id}/{unit_id}/button_{button_number}`
+- All events stream: `casambi_bt/switch/{entry_id}/events`
+
+Event payload includes:
+```json
+{
+  "unit_id": "123",
+  "button": 1,
+  "event": "button_press",
+  "action": "press",
+  "timestamp": "2024-01-01T12:00:00+00:00"
+}
+```
+
+Note: MQTT is optional. If not configured, the integration works normally without publishing switch events.
 
 # Home Assistant integration for Casambi using Bluetooth
 
@@ -45,7 +70,7 @@ Supported control types:
 - Vertical
 
 Not supported yet:
-- Switches
+- Switches (as Home Assistant switch entities - but switch events are published to MQTT)
 - Sensors
 - Additional control types (e.g. temperature, ...)
 - Networks with classic firmware

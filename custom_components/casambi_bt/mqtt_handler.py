@@ -7,7 +7,7 @@ import json
 import logging
 from typing import Any, Final
 
-from homeassistant.components import mqtt
+# MQTT will be accessed through hass.components.mqtt
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.util import dt as dt_util
@@ -25,7 +25,11 @@ class CasambiMQTTHandler:
         self.hass = hass
         self.entry_id = entry_id
         try:
-            self._mqtt_available = mqtt.async_mqtt_client_is_available(hass)
+            # Check if MQTT is available through hass.components
+            if hasattr(hass.components, 'mqtt'):
+                self._mqtt_available = hass.components.mqtt.async_mqtt_client_is_available(hass)
+            else:
+                self._mqtt_available = False
         except Exception:
             self._mqtt_available = False
         
@@ -58,7 +62,7 @@ class CasambiMQTTHandler:
             payload = {k: v for k, v in payload.items() if v is not None}
             
             # Publish to MQTT
-            await mqtt.async_publish(
+            await self.hass.components.mqtt.async_publish(
                 self.hass,
                 topic,
                 json.dumps(payload),
@@ -73,7 +77,7 @@ class CasambiMQTTHandler:
             general_payload = payload.copy()
             general_payload["topic"] = topic
             
-            await mqtt.async_publish(
+            await self.hass.components.mqtt.async_publish(
                 self.hass,
                 general_topic,
                 json.dumps(general_payload),

@@ -138,7 +138,12 @@ class CasambiApi:
 
             self.casa.registerDisconnectCallback(self._casa_disconnect)
             self.casa.registerUnitChangedHandler(self._unit_changed_handler)
-            self.casa.registerSwitchEventHandler(self._switch_event_handler)
+            
+            # Register switch event handler if available (new in casambi-bt 0.3.0)
+            if hasattr(self.casa, 'registerSwitchEventHandler'):
+                self.casa.registerSwitchEventHandler(self._switch_event_handler)
+            else:
+                _LOGGER.warning("Switch event handler not available in casambi-bt library. Please update to latest version.")
 
             await self.casa.connect(device, self.password)
             self._first_disconnect = True
@@ -206,7 +211,10 @@ class CasambiApi:
             except Exception:
                 _LOGGER.exception("Error during disconnect.")
             self.casa.unregisterUnitChangedHandler(self._unit_changed_handler)
-            self.casa.unregisterSwitchEventHandler(self._switch_event_handler)
+            
+            # Unregister switch event handler if available
+            if hasattr(self.casa, 'unregisterSwitchEventHandler'):
+                self.casa.unregisterSwitchEventHandler(self._switch_event_handler)
 
     @callback
     def _casa_disconnect(self) -> None:

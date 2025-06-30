@@ -7,11 +7,7 @@ import json
 import logging
 from typing import Any, Final
 
-try:
-    from homeassistant.components import mqtt
-    MQTT_AVAILABLE = True
-except ImportError:
-    MQTT_AVAILABLE = False
+from homeassistant.components import mqtt
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.util import dt as dt_util
@@ -28,7 +24,10 @@ class CasambiMQTTHandler:
         """Initialize the MQTT handler."""
         self.hass = hass
         self.entry_id = entry_id
-        self._mqtt_available = MQTT_AVAILABLE and mqtt.async_mqtt_client_is_available(hass)
+        try:
+            self._mqtt_available = mqtt.async_mqtt_client_is_available(hass)
+        except Exception:
+            self._mqtt_available = False
         
         if not self._mqtt_available:
             _LOGGER.warning("MQTT is not available. Switch events will not be published.")

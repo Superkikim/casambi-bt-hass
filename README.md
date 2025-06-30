@@ -49,9 +49,16 @@ You can monitor these events in Developer Tools → Events → Listen to events 
 
 ### Important Notes for Switch Events
 
-#### Message Types
-- **Message Type 8**: Valid button press/release events with correct button index and unit ID
-- **Message Type 16**: Currently unknown status reporting - can be safely ignored
+#### Message Types and Event Data
+- **Message Type 8**: Usually valid button press/release events
+- **Message Type 16**: Sometimes also valid events - verify by listening to actual events from your switch
+
+**Important**: The event data fields are based on guesswork and may be incorrect. However, the values are consistent enough to be usable. Sometimes the `flags` field, combined with `unit_id`, `button`, and `message_type`, creates a unique combination that can be used to identify specific button actions.
+
+**Tip**: You can use the Casambi app to configure switch button actions while simultaneously listening to events in Home Assistant. This allows you to:
+- Use Casambi's built-in button assignments for some actions
+- Create custom Home Assistant automations for other buttons
+- Have multiple ways to control your devices
 
 #### Finding Your Switch Configuration
 To identify your switch's unit ID:

@@ -25,13 +25,19 @@ Switch button press/release events are fired as Home Assistant events that can b
 ```yaml
 automation:
   - alias: "Casambi Switch Button Press"
+    mode: single  # Prevents duplicate executions
     trigger:
       - platform: event
         event_type: casambi_bt_switch_event
         event_data:
           unit_id: 123  # Your switch unit ID
-          button: 0     # Button number
+          button: 0     # Button number (0-based)
           action: "button_press"
+    condition:
+      # Prevent re-triggering within 2 seconds
+      - condition: template
+        value_template: >
+          {{ (as_timestamp(now()) - as_timestamp(state_attr('automation.casambi_switch_button_press', 'last_triggered') | default(0))) > 2 }}
     action:
       - service: light.toggle
         target:
@@ -40,6 +46,26 @@ automation:
 
 ### Listening to Events
 You can monitor these events in Developer Tools → Events → Listen to events by entering `casambi_bt_switch_event` as the event type.
+
+### Important Notes for Switch Events
+
+#### Message Types
+- **Message Type 8**: Valid button press/release events with correct button index and unit ID
+- **Message Type 16**: Currently unknown status reporting - can be safely ignored
+
+#### Finding Your Switch Configuration
+To identify your switch's unit ID:
+1. Open the Casambi app
+2. Go to More → Switches
+3. Select your switch
+4. Tap Details → Note the Unit ID
+
+**Button Numbering**: The Casambi app displays buttons starting from 1, but Home Assistant events use 0-based indexing. For example:
+- Button 1 in Casambi app = Button 0 in Home Assistant events
+- Button 2 in Casambi app = Button 1 in Home Assistant events
+
+#### Handling Duplicate Events
+The Casambi protocol may send multiple duplicate event packets for reliability. You'll need to implement debouncing in your automations to handle this. See the example automation above which includes a 2-second cooldown period to prevent duplicate triggers.
 
 # Home Assistant integration for Casambi using Bluetooth
 

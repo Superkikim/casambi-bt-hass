@@ -34,10 +34,6 @@ automation:
           button: 0     # Button number (0-based)
           # Trigger on either press or release for better reliability
     condition:
-      # Only trigger on press OR release events
-      - condition: template
-        value_template: >
-          {{ trigger.event.data.action in ['button_press', 'button_release'] }}
       # Prevent re-triggering within 2 seconds
       - condition: template
         value_template: >

@@ -27,7 +27,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Create the Casambi scene entities."""
-    casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]["api"]
+    casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
 
     scenes = [CasambiScene(casa_api, scene) for scene in casa_api.get_scenes()]
     async_add_entities(scenes)

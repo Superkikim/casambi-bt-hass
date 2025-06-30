@@ -35,7 +35,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Create the Casambi vertical entity."""
-    casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]["api"]
+    casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
 
     light_entities: list[CasambiVerticalNumber] = [
         CasambiVerticalNumberUnit(casa_api, u)

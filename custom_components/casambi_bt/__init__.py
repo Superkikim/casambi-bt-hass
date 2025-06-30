@@ -49,16 +49,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up MQTT handler for switch events (optional)
     mqtt_handler = None
     try:
-        from homeassistant.components import mqtt as mqtt_component
-        mqtt_handler = CasambiMQTTHandler(hass, entry.entry_id)
-        if mqtt_handler.is_available():
-            api.register_switch_event_callback(mqtt_handler.publish_switch_event)
-            _LOGGER.info("MQTT handler registered for switch events")
+        # Check if MQTT is available through hass.components
+        if hasattr(hass.components, 'mqtt'):
+            mqtt_handler = CasambiMQTTHandler(hass, entry.entry_id)
+            if mqtt_handler.is_available():
+                api.register_switch_event_callback(mqtt_handler.publish_switch_event)
+                _LOGGER.info("MQTT handler registered for switch events")
+            else:
+                _LOGGER.info("MQTT client not available, switch events will not be published to MQTT")
         else:
-            _LOGGER.info("MQTT client not available, switch events will not be published to MQTT")
-    except ImportError as e:
-        _LOGGER.info(f"MQTT integration not loaded: {e}")
-        mqtt_handler = None
+            _LOGGER.info("MQTT integration not loaded in Home Assistant")
     except Exception as e:
         _LOGGER.exception(f"Error setting up MQTT handler: {e}")
         mqtt_handler = None

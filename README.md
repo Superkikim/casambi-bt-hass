@@ -60,9 +60,14 @@ To identify your switch's unit ID:
 3. Select your switch
 4. Tap Details → Note the Unit ID
 
-**Button Numbering**: The Casambi app displays buttons starting from 1, but Home Assistant events use 0-based indexing. For example:
-- Button 1 in Casambi app = Button 0 in Home Assistant events
-- Button 2 in Casambi app = Button 1 in Home Assistant events
+**Identifying Button Numbers**: Due to potential parsing differences, the button number shown in Home Assistant events may not directly match the Casambi app numbering. To find the correct button number for your automations:
+1. Go to Developer Tools → Events in Home Assistant
+2. Start listening for `casambi_bt_switch_event`
+3. Press the physical button on your switch
+4. Check the captured event data for the actual `button` value
+5. Use this value in your automations
+
+This is the most reliable way to identify button mappings for your specific switch model.
 
 #### Handling Duplicate Events
 The Casambi protocol may send multiple duplicate event packets for reliability. You'll need to implement debouncing in your automations to handle this. See the example automation above which includes a 2-second cooldown period to prevent duplicate triggers.

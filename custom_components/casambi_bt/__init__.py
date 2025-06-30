@@ -23,6 +23,7 @@ from homeassistant.exceptions import (
 from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import DOMAIN, PLATFORMS
+from .mqtt_handler import CasambiMQTTHandler
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -30,9 +31,38 @@ _LOGGER: Final = logging.getLogger(__name__)
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Casambi Bluetooth from a config entry."""
     _LOGGER.debug(f"Connecting to ${CONF_ADDRESS} with ${CONF_PASSWORD}")
+    
+    # Check if we need to migrate from old data structure
+    if entry.entry_id in hass.data.get(DOMAIN, {}):
+        existing_data = hass.data[DOMAIN][entry.entry_id]
+        if isinstance(existing_data, CasambiApi):
+            _LOGGER.warning("Migrating from old Casambi data structure")
+            # Disconnect the old API instance
+            try:
+                await existing_data.disconnect()
+            except Exception:
+                pass
+    
     api = CasambiApi(hass, entry, entry.data[CONF_ADDRESS], entry.data[CONF_PASSWORD])
     await api.connect()
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = api
+    
+    # Set up MQTT handler for switch events (optional)
+    mqtt_handler = None
+    try:
+        mqtt_handler = CasambiMQTTHandler(hass, entry.entry_id)
+        if mqtt_handler.is_available():
+            api.register_switch_event_callback(mqtt_handler.publish_switch_event)
+            _LOGGER.info("MQTT handler registered for switch events")
+        else:
+            _LOGGER.info("MQTT not available, switch events will not be published to MQTT")
+    except Exception:
+        _LOGGER.info("MQTT integration not found, switch events will not be published to MQTT")
+        mqtt_handler = None
+    
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
+        "api": api,
+        "mqtt_handler": mqtt_handler,
+    }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -43,7 +73,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
-    casa_api: CasambiApi = hass.data[DOMAIN][entry.entry_id]
+    data = hass.data[DOMAIN][entry.entry_id]
+    casa_api: CasambiApi = data["api"]
+    mqtt_handler: CasambiMQTTHandler = data["mqtt_handler"]
+    
+    # Unregister MQTT handler if available
+    if mqtt_handler and mqtt_handler.is_available():
+        casa_api.unregister_switch_event_callback(mqtt_handler.publish_switch_event)
+    
     await casa_api.disconnect()
 
     if unload_ok:
@@ -77,6 +114,7 @@ class CasambiApi:
         self.casa: Casambi = Casambi(get_async_client(hass), get_cache_dir(hass))
 
         self._callback_map: dict[int, list[Callable[[Unit], None]]] = {}
+        self._switch_event_callbacks: list[Callable[[dict], None]] = []
         self._cancel_bluetooth_callback: Callable[[], None] | None = None
         self._reconnect_lock = asyncio.Lock()
         self._first_disconnect = True
@@ -100,6 +138,7 @@ class CasambiApi:
 
             self.casa.registerDisconnectCallback(self._casa_disconnect)
             self.casa.registerUnitChangedHandler(self._unit_changed_handler)
+            self.casa.registerSwitchEventHandler(self._switch_event_handler)
 
             await self.casa.connect(device, self.password)
             self._first_disconnect = True
@@ -167,6 +206,7 @@ class CasambiApi:
             except Exception:
                 _LOGGER.exception("Error during disconnect.")
             self.casa.unregisterUnitChangedHandler(self._unit_changed_handler)
+            self.casa.unregisterSwitchEventHandler(self._switch_event_handler)
 
     @callback
     def _casa_disconnect(self) -> None:
@@ -235,6 +275,29 @@ class CasambiApi:
             return
         for c in self._callback_map[unit.deviceId]:
             c(unit)
+
+    @callback
+    def _switch_event_handler(self, event_data: dict) -> None:
+        """Handle switch events from the Casambi network."""
+        _LOGGER.debug(f"Switch event received: {event_data}")
+        for callback in self._switch_event_callbacks:
+            if asyncio.iscoroutinefunction(callback):
+                self.conf_entry.async_create_task(
+                    self.hass, callback(event_data), "switch_event_callback"
+                )
+            else:
+                callback(event_data)
+
+    def register_switch_event_callback(self, callback: Callable[[dict], None]) -> None:
+        """Register a callback for switch events."""
+        self._switch_event_callbacks.append(callback)
+        _LOGGER.debug(f"Registered switch event callback: {callback}")
+
+    def unregister_switch_event_callback(self, callback: Callable[[dict], None]) -> None:
+        """Unregister a callback for switch events."""
+        if callback in self._switch_event_callbacks:
+            self._switch_event_callbacks.remove(callback)
+            _LOGGER.debug(f"Unregistered switch event callback: {callback}")
 
     @callback
     def _bluetooth_callback(

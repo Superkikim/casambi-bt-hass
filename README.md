@@ -32,8 +32,12 @@ automation:
         event_data:
           unit_id: 123  # Your switch unit ID
           button: 0     # Button number (0-based)
-          action: "button_press"
+          # Trigger on either press or release for better reliability
     condition:
+      # Only trigger on press OR release events
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.action in ['button_press', 'button_release'] }}
       # Prevent re-triggering within 2 seconds
       - condition: template
         value_template: >
@@ -66,6 +70,29 @@ To identify your switch's unit ID:
 
 #### Handling Duplicate Events
 The Casambi protocol may send multiple duplicate event packets for reliability. You'll need to implement debouncing in your automations to handle this. See the example automation above which includes a 2-second cooldown period to prevent duplicate triggers.
+
+#### Event Reliability
+Button press and release events are **not guaranteed** to be captured due to the nature of Bluetooth communication. For better reliability, it's recommended to trigger automations on both `button_press` and `button_release` events rather than relying on just one type.
+
+### Example Event Data
+Here's what a switch event looks like in Home Assistant:
+
+```yaml
+event_type: casambi_bt_switch_event
+data:
+  entry_id: fc8461de92e186495147fdb327fddea9
+  unit_id: 31
+  button: 0
+  action: button_release
+  message_type: 8
+  flags: 3
+origin: LOCAL
+time_fired: "2025-06-30T20:11:50.982312+00:00"
+context:
+  id: 01JZ17F9T69MTHZ52KNRDXYYDC
+  parent_id: null
+  user_id: null
+```
 
 # Home Assistant integration for Casambi using Bluetooth
 

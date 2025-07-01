@@ -15,5 +15,5 @@
   "integration_type": "hub",
   "iot_class": "local_push",
   "requirements": ["casambi-bt-revamped==0.3.0.dev2"],
-  "version": "1.1.0.dev1"
+  "version": "1.1.1"
 }

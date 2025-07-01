@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Iterable
+import contextlib
 import logging
 from pathlib import Path
 from typing import Final
@@ -29,22 +30,20 @@ _LOGGER: Final = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Casambi Bluetooth from a config entry."""
-    _LOGGER.debug(f"Connecting to ${CONF_ADDRESS} with ${CONF_PASSWORD}")
-    
+    _LOGGER.debug("Connecting to %s with %s", CONF_ADDRESS, CONF_PASSWORD)
+
     # Check if we need to migrate from old data structure
     if entry.entry_id in hass.data.get(DOMAIN, {}):
         existing_data = hass.data[DOMAIN][entry.entry_id]
         if isinstance(existing_data, CasambiApi):
             _LOGGER.warning("Migrating from old Casambi data structure")
             # Disconnect the old API instance
-            try:
+            with contextlib.suppress(Exception):
                 await existing_data.disconnect()
-            except Exception:
-                pass
-    
+
     api = CasambiApi(hass, entry, entry.data[CONF_ADDRESS], entry.data[CONF_PASSWORD])
     await api.connect()
-    
+
     # Register switch event handler that fires Home Assistant events
     def handle_switch_event(event_data: dict) -> None:
         """Fire a Home Assistant event when a switch is pressed/released."""
@@ -60,15 +59,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             }
         )
         _LOGGER.debug(
-            f"Fired {DOMAIN}_switch_event for unit {event_data.get('unit_id')} "
-            f"button {event_data.get('button')} - {event_data.get('event')}"
+            "Fired %s_switch_event for unit %s button %s - %s",
+            DOMAIN,
+            event_data.get('unit_id'),
+            event_data.get('button'),
+            event_data.get('event')
         )
-    
+
     # Register the event handler if the library supports it
     if hasattr(api.casa, 'registerSwitchEventHandler'):
         api.register_switch_event_callback(handle_switch_event)
         _LOGGER.info("Switch event handler registered - events will fire as casambi_bt_switch_event")
-    
+
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = api
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -138,7 +140,7 @@ class CasambiApi:
 
             self.casa.registerDisconnectCallback(self._casa_disconnect)
             self.casa.registerUnitChangedHandler(self._unit_changed_handler)
-            
+
             # Register switch event handler if available (new in casambi-bt 0.3.0)
             if hasattr(self.casa, 'registerSwitchEventHandler'):
                 self.casa.registerSwitchEventHandler(self._switch_event_handler)
@@ -211,7 +213,7 @@ class CasambiApi:
             except Exception:
                 _LOGGER.exception("Error during disconnect.")
             self.casa.unregisterUnitChangedHandler(self._unit_changed_handler)
-            
+
             # Unregister switch event handler if available
             if hasattr(self.casa, 'unregisterSwitchEventHandler'):
                 self.casa.unregisterSwitchEventHandler(self._switch_event_handler)
@@ -287,25 +289,25 @@ class CasambiApi:
     @callback
     def _switch_event_handler(self, event_data: dict) -> None:
         """Handle switch events from the Casambi network."""
-        _LOGGER.debug(f"Switch event received: {event_data}")
-        for callback in self._switch_event_callbacks:
-            if asyncio.iscoroutinefunction(callback):
+        _LOGGER.debug("Switch event received: %s", event_data)
+        for cb in self._switch_event_callbacks:
+            if asyncio.iscoroutinefunction(cb):
                 self.conf_entry.async_create_task(
-                    self.hass, callback(event_data), "switch_event_callback"
+                    self.hass, cb(event_data), "switch_event_callback"
                 )
             else:
-                callback(event_data)
+                cb(event_data)
 
     def register_switch_event_callback(self, callback: Callable[[dict], None]) -> None:
         """Register a callback for switch events."""
         self._switch_event_callbacks.append(callback)
-        _LOGGER.debug(f"Registered switch event callback: {callback}")
+        _LOGGER.debug("Registered switch event callback: %s", callback)
 
     def unregister_switch_event_callback(self, callback: Callable[[dict], None]) -> None:
         """Unregister a callback for switch events."""
         if callback in self._switch_event_callbacks:
             self._switch_event_callbacks.remove(callback)
-            _LOGGER.debug(f"Unregistered switch event callback: {callback}")
+            _LOGGER.debug("Unregistered switch event callback: %s", callback)
 
     @callback
     def _bluetooth_callback(

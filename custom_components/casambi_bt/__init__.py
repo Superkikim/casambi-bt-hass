@@ -71,7 +71,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             event_data.get('button'),
             event_data.get('event'),
             event_data.get('packet_sequence'),
-            event_data.get('raw_packet')[:20] + '...' if event_data.get('raw_packet') else 'None'
+            (event_data.get('raw_packet')[:20] + '...') if event_data.get('raw_packet') else 'None'
         )
 
     # Register the event handler if the library supports it

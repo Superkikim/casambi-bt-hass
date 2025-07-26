@@ -88,32 +88,46 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             # Record this event
             event_cache[cache_key] = current_time
         
-        hass.bus.async_fire(
-            f"{DOMAIN}_switch_event",
-            {
-                "entry_id": entry.entry_id,
-                "unit_id": event_data.get("unit_id"),
-                "button": event_data.get("button"),
-                "action": event_data.get("event"),  # "button_press" or "button_release"
-                "message_type": event_data.get("message_type"),
-                "flags": event_data.get("flags"),
-                "packet_sequence": event_data.get("packet_sequence"),
-                "raw_packet": raw_packet.hex() if isinstance(raw_packet, bytes) else raw_packet,
-                "decrypted_data": decrypted_data.hex() if isinstance(decrypted_data, bytes) else decrypted_data,
-                "message_position": event_data.get("message_position"),
-                "payload_hex": payload_hex_str,
-                "extra_data": extra_data.hex() if isinstance(extra_data, bytes) else None,
-            }
-        )
+        # Get the event type
+        event_type = event_data.get("event")
+        
+        # Fire the main event
+        event_payload = {
+            "entry_id": entry.entry_id,
+            "unit_id": event_data.get("unit_id"),
+            "button": event_data.get("button"),
+            "action": event_type,
+            "message_type": event_data.get("message_type"),
+            "flags": event_data.get("flags"),
+            "packet_sequence": event_data.get("packet_sequence"),
+            "raw_packet": raw_packet.hex() if isinstance(raw_packet, bytes) else raw_packet,
+            "decrypted_data": decrypted_data.hex() if isinstance(decrypted_data, bytes) else decrypted_data,
+            "message_position": event_data.get("message_position"),
+            "payload_hex": payload_hex_str,
+            "extra_data": extra_data.hex() if isinstance(extra_data, bytes) else None,
+        }
+        
+        hass.bus.async_fire(f"{DOMAIN}_switch_event", event_payload)
         _LOGGER.debug(
             "Fired %s_switch_event for unit %s button %s - %s (seq: %s, raw: %s)",
             DOMAIN,
             event_data.get('unit_id'),
             event_data.get('button'),
-            event_data.get('event'),
+            event_type,
             event_data.get('packet_sequence'),
             (raw_packet.hex()[:20] + '...') if raw_packet else 'None'
         )
+        
+        # For compatibility: also fire a button_release event for button_release_after_hold
+        if event_type == "button_release_after_hold":
+            compat_payload = event_payload.copy()
+            compat_payload["action"] = "button_release"
+            compat_payload["original_action"] = "button_release_after_hold"
+            
+            hass.bus.async_fire(f"{DOMAIN}_switch_event", compat_payload)
+            _LOGGER.debug(
+                "Fired compatibility button_release event for button_release_after_hold"
+            )
 
     # Register the event handler if the library supports it
     if hasattr(api.casa, 'registerSwitchEventHandler'):

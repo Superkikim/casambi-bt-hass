@@ -7,6 +7,7 @@ from collections.abc import Callable, Iterable
 import contextlib
 import logging
 from pathlib import Path
+import time
 from typing import Final
 
 from CasambiBt import Casambi, Group, Scene, Unit, UnitControlType
@@ -44,6 +45,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api = CasambiApi(hass, entry, entry.data[CONF_ADDRESS], entry.data[CONF_PASSWORD])
     await api.connect()
 
+    # Event deduplication cache: (unit_id, button, payload_hex) -> timestamp
+    event_cache: dict[tuple[int, int, str], float] = {}
+    DEDUP_WINDOW_SECONDS = 10.0
+    
+    _LOGGER.info("Switch event deduplication enabled with %ss window", DEDUP_WINDOW_SECONDS)
+
     # Register switch event handler that fires Home Assistant events
     def handle_switch_event(event_data: dict) -> None:
         """Fire a Home Assistant event when a switch is pressed/released."""
@@ -52,6 +59,34 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         decrypted_data = event_data.get("decrypted_data")
         payload_hex = event_data.get("payload_hex")
         extra_data = event_data.get("extra_data")
+        
+        # Convert payload_hex to string if it's bytes
+        payload_hex_str = payload_hex.hex() if isinstance(payload_hex, bytes) else payload_hex
+        
+        # Check for duplicate events
+        unit_id = event_data.get("unit_id")
+        button = event_data.get("button")
+        
+        if unit_id is not None and button is not None and payload_hex_str:
+            cache_key = (unit_id, button, payload_hex_str)
+            current_time = time.time()
+            
+            # Clean up old entries from cache
+            for key in list(event_cache.keys()):
+                if current_time - event_cache[key] > DEDUP_WINDOW_SECONDS:
+                    del event_cache[key]
+            
+            # Check if this event was seen recently
+            if cache_key in event_cache:
+                _LOGGER.debug(
+                    "Skipping duplicate event: unit=%s, button=%s, payload=%s (last seen %.1fs ago)",
+                    unit_id, button, payload_hex_str[:8],
+                    current_time - event_cache[cache_key]
+                )
+                return
+            
+            # Record this event
+            event_cache[cache_key] = current_time
         
         hass.bus.async_fire(
             f"{DOMAIN}_switch_event",
@@ -66,7 +101,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "raw_packet": raw_packet.hex() if isinstance(raw_packet, bytes) else raw_packet,
                 "decrypted_data": decrypted_data.hex() if isinstance(decrypted_data, bytes) else decrypted_data,
                 "message_position": event_data.get("message_position"),
-                "payload_hex": payload_hex.hex() if isinstance(payload_hex, bytes) else payload_hex,
+                "payload_hex": payload_hex_str,
                 "extra_data": extra_data.hex() if isinstance(extra_data, bytes) else None,
             }
         )

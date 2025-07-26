@@ -22,14 +22,15 @@ blueprint:
       default: ""
       selector:
         text:
-    target_light:
-      name: Target Light
-      description: The light or light group to control
+    target_lights:
+      name: Target Lights
+      description: The lights or light groups to control
       selector:
-        entity:
-          domain: 
-            - light
-            - group
+        target:
+          entity:
+            domain: 
+              - light
+              - group
     dimming_direction:
       name: Dimming Direction
       description: Direction to dim when holding the button
@@ -84,7 +85,7 @@ max: 3
 
 variables:
   message_type: !input message_type
-  target_light: !input target_light
+  target_lights: !input target_lights
   dimming_direction: !input dimming_direction
   dimming_step: !input dimming_step
   dimming_interval: !input dimming_interval
@@ -116,16 +117,18 @@ action:
           - condition: template
             value_template: >
               {{ trigger.event.data.action == 'button_release' and 
-                 states(button_state_helper) != 'holding_up' and 
-                 states(button_state_helper) != 'holding_down' }}
-          # Debounce check
-          - condition: template
-            value_template: >
-              {{ (as_timestamp(now()) - as_timestamp(state_attr(this.entity_id, 'last_triggered') | default(0))) > debounce_time }}
+                 (states(button_state_helper) == 'pressed' or
+                  (states(button_state_helper) != 'holding_up' and 
+                   states(button_state_helper) != 'holding_down')) }}
         sequence:
           - service: light.toggle
+            target: !input target_lights
+          # Reset helper after toggle
+          - service: input_text.set_value
             target:
-              entity_id: !input target_light
+              entity_id: !input button_state_helper
+            data:
+              value: "idle"
       
       # Handle button press - just track state
       - conditions:
@@ -167,13 +170,14 @@ action:
               entity_id: !input button_state_helper
             data:
               value: >
-                {% set light_entity = target_light %}
+                {% set lights = target_lights.entity_id if target_lights.entity_id is string else target_lights.entity_id | list %}
+                {% set first_light = lights if lights is string else lights[0] %}
                 {% set direction = dimming_direction | default('toggle') %}
                 {% if direction == 'down' %}
                   holding_down
                 {% elif direction == 'up' %}
                   holding_up
-                {% elif states(light_entity) == 'on' and (state_attr(light_entity, 'brightness') | int(0) > 127) %}
+                {% elif states(first_light) == 'on' and (state_attr(first_light, 'brightness') | int(0) > 127) %}
                   holding_down
                 {% else %}
                   holding_up
@@ -187,11 +191,12 @@ action:
                     {{ states(button_state_helper) in ['holding_up', 'holding_down'] }}
               sequence:
                 - variables:
-                    light_entity: !input target_light
+                    lights: "{{ target_lights.entity_id if target_lights.entity_id is string else target_lights.entity_id | list }}"
+                    first_light: "{{ lights if lights is string else lights[0] }}"
                     helper_state: "{{ states(button_state_helper) }}"
                     dimming_step_value: !input dimming_step
                     step_pct: "{{ (dimming_step_value | default(25) / 255 * 100) | round(1) }}"
-                    current_brightness: "{{ state_attr(light_entity, 'brightness') | int(255) }}"
+                    current_brightness: "{{ state_attr(first_light, 'brightness') | int(255) }}"
                     calculated_step: >
                       {% if helper_state == 'holding_down' %}
                         {% if current_brightness > 16 %}
@@ -204,8 +209,7 @@ action:
                       {% endif %}
                 
                 - service: light.turn_on
-                  target:
-                    entity_id: !input target_light
+                  target: !input target_lights
                   data:
                     brightness_step_pct: "{{ calculated_step }}"
                     transition: >

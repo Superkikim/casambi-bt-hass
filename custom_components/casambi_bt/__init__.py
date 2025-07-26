@@ -56,14 +56,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "action": event_data.get("event"),  # "button_press" or "button_release"
                 "message_type": event_data.get("message_type"),
                 "flags": event_data.get("flags"),
+                "packet_sequence": event_data.get("packet_sequence"),
+                "raw_packet": event_data.get("raw_packet"),
+                "decrypted_data": event_data.get("decrypted_data"),
+                "message_position": event_data.get("message_position"),
+                "payload_hex": event_data.get("payload_hex"),
+                "extra_data": event_data.get("extra_data").hex() if event_data.get("extra_data") else None,
             }
         )
         _LOGGER.debug(
-            "Fired %s_switch_event for unit %s button %s - %s",
+            "Fired %s_switch_event for unit %s button %s - %s (seq: %s, raw: %s)",
             DOMAIN,
             event_data.get('unit_id'),
             event_data.get('button'),
-            event_data.get('event')
+            event_data.get('event'),
+            event_data.get('packet_sequence'),
+            event_data.get('raw_packet')[:20] + '...' if event_data.get('raw_packet') else 'None'
         )
 
     # Register the event handler if the library supports it

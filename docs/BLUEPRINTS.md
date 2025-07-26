@@ -4,17 +4,22 @@ This integration includes several automation blueprints to make it easy to set u
 
 ## Available Blueprints
 
-### 1. Casambi Button Press Action
+### 1. Casambi Button Toggle and Dim
+**All-in-one light control** - Short press to toggle, hold to dim (recommended for lights)
+
+[![Import Toggle and Dim Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_toggle_and_dim.yaml)
+
+### 2. Casambi Button Press Action
 Simple action on button press/release
 
 [![Import Button Press Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_press_action.yaml)
 
-### 2. Casambi Button Hold Dimming
+### 3. Casambi Button Hold Dimming
 Dim lights while holding a button (requires an input_text helper)
 
 [![Import Button Hold Dimming Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_hold_dimming.yaml)
 
-### 3. Casambi Button Short/Long Press Actions
+### 4. Casambi Button Short/Long Press Actions
 Different actions for short vs long press
 
 [![Import Short/Long Press Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_short_long_press.yaml)

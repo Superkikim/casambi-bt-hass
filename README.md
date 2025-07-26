@@ -3,7 +3,7 @@
 This is an enhanced version of the original Casambi Bluetooth integration with the following improvements:
 
 - **Fixed relay status** - Properly reports the status of relay units
-- **Switch event support** - Physical switch/button press events are fired as Home Assistant events for automations
+- **Switch event support** - Physical switch/button press, hold, and release events are fired as Home Assistant events for automations
 - **Based on modified casambi-bt library** - Uses an enhanced version of the underlying library for better device support
 
 ## Switch Event Support
@@ -16,12 +16,18 @@ Switch button press/release events are fired as Home Assistant events that can b
   - `entry_id`: The config entry ID
   - `unit_id`: The Casambi unit ID that sent the event
   - `button`: Button number (0-based)
-  - `action`: Either "button_press" or "button_release"
+  - `action`: Event type - one of:
+    - `"button_press"` - Initial button press
+    - `"button_hold"` - Sent continuously while button is held down
+    - `"button_release"` - Quick press and release
+    - `"button_release_after_hold"` - Release after holding (also fires a compatibility `button_release` event)
   - `message_type`: Raw message type from the device
   - `flags`: Additional flags from the message
+  - `original_action`: (Only in compatibility events) The original action before compatibility mapping
 
-### Example Automation
+### Example Automations
 
+#### Simple Toggle on Press
 ```yaml
 automation:
   - alias: "Casambi Switch Button Press"
@@ -32,7 +38,7 @@ automation:
         event_data:
           unit_id: 123  # Your switch unit ID
           button: 0     # Button number (0-based)
-          # Trigger on either press or release for better reliability
+          action: button_press
     condition:
       # Prevent re-triggering within 2 seconds
       - condition: template
@@ -42,6 +48,84 @@ automation:
       - service: light.toggle
         target:
           entity_id: light.living_room
+```
+
+#### Dimming with Hold
+```yaml
+automation:
+  - alias: "Casambi Switch Dimming"
+    mode: restart  # Restart if triggered again while running
+    trigger:
+      - platform: event
+        event_type: casambi_bt_switch_event
+        event_data:
+          unit_id: 123  # Your switch unit ID
+          button: 0     # Button number (0-based)
+          action: button_hold
+    action:
+      - repeat:
+          while:
+            - condition: template
+              value_template: "{{ true }}"  # Continues until automation is stopped
+          sequence:
+            - service: light.turn_on
+              target:
+                entity_id: light.living_room
+              data:
+                brightness: >
+                  {% set current = state_attr('light.living_room', 'brightness') | default(0) %}
+                  {% set new = current + 10 %}
+                  {{ [new, 255] | min }}
+            - delay:
+                milliseconds: 200
+
+  - alias: "Stop Dimming on Release"
+    trigger:
+      - platform: event
+        event_type: casambi_bt_switch_event
+        event_data:
+          unit_id: 123
+          button: 0
+          action: button_release_after_hold
+    action:
+      - service: automation.turn_off
+        entity_id: automation.casambi_switch_dimming
+      - delay:
+          seconds: 1
+      - service: automation.turn_on
+        entity_id: automation.casambi_switch_dimming
+```
+
+#### Different Actions for Short Press vs Long Press
+```yaml
+automation:
+  - alias: "Casambi Switch Short Press"
+    trigger:
+      - platform: event
+        event_type: casambi_bt_switch_event
+        event_data:
+          unit_id: 123
+          button: 0
+          action: button_release  # Quick press/release
+    condition:
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.get('original_action') != 'button_release_after_hold' }}
+    action:
+      - service: light.toggle
+        entity_id: light.living_room
+
+  - alias: "Casambi Switch Long Press"
+    trigger:
+      - platform: event
+        event_type: casambi_bt_switch_event
+        event_data:
+          unit_id: 123
+          button: 0
+          action: button_release_after_hold
+    action:
+      - service: scene.turn_on
+        entity_id: scene.movie_time
 ```
 
 ### Listening to Events
@@ -83,8 +167,9 @@ The Casambi protocol may send multiple duplicate event packets for reliability. 
 Button press and release events are **not guaranteed** to be captured due to the nature of Bluetooth communication. For better reliability, it's recommended to trigger automations on both `button_press` and `button_release` events rather than relying on just one type.
 
 ### Example Event Data
-Here's what a switch event looks like in Home Assistant:
+Here are examples of different switch events in Home Assistant:
 
+#### Quick Press/Release
 ```yaml
 event_type: casambi_bt_switch_event
 data:
@@ -95,11 +180,46 @@ data:
   message_type: 8
   flags: 3
 origin: LOCAL
-time_fired: "2025-06-30T20:11:50.982312+00:00"
-context:
-  id: 01JZ17F9T69MTHZ52KNRDXYYDC
-  parent_id: null
-  user_id: null
+```
+
+#### Button Hold Event (fires continuously)
+```yaml
+event_type: casambi_bt_switch_event
+data:
+  entry_id: fc8461de92e186495147fdb327fddea9
+  unit_id: 31
+  button: 0
+  action: button_hold
+  message_type: 16
+  flags: 2
+origin: LOCAL
+```
+
+#### Release After Hold
+```yaml
+event_type: casambi_bt_switch_event
+data:
+  entry_id: fc8461de92e186495147fdb327fddea9
+  unit_id: 31
+  button: 0
+  action: button_release_after_hold
+  message_type: 16
+  flags: 2
+origin: LOCAL
+```
+
+#### Compatibility Event (automatically fired with button_release_after_hold)
+```yaml
+event_type: casambi_bt_switch_event
+data:
+  entry_id: fc8461de92e186495147fdb327fddea9
+  unit_id: 31
+  button: 0
+  action: button_release
+  original_action: button_release_after_hold  # Indicates this is a compatibility event
+  message_type: 16
+  flags: 2
+origin: LOCAL
 ```
 
 # Home Assistant integration for Casambi using Bluetooth

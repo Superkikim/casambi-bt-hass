@@ -150,7 +150,8 @@ action:
                   data:
                     brightness: >
                       {% set light_entity = target_light %}
-                      {% set current = state_attr(light_entity, 'brightness') | default(128) %}
+                      {% set current_brightness = state_attr(light_entity, 'brightness') %}
+                      {% set current = current_brightness if current_brightness is not none else 0 %}
                       {% set step = dimming_step | default(10) %}
                       {% set direction = dimming_direction | default('toggle') %}
                       {% set helper = button_state_helper %}

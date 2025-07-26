@@ -86,8 +86,6 @@ This integration is based on the excellent work by [@lkempf](https://github.com/
 - Original integration: [casambi-bt-hass](https://github.com/lkempf/casambi-bt-hass)
 - Original library: [casambi-bt](https://github.com/lkempf/casambi-bt)
 
-Enhanced features added by [@rankjie](https://github.com/rankjie).
-
 ## Development
 
 For development setup and contribution guidelines, see the [original repository](https://github.com/lkempf/casambi-bt-hass#development).

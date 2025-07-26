@@ -22,13 +22,12 @@ blueprint:
       default: ""
       selector:
         text:
-    target_lights:
-      name: Target Lights
-      description: The lights to control (select one or more)
+    target_light:
+      name: Target Light
+      description: The light to control
       selector:
         entity:
           domain: light
-          multiple: true
     dimming_direction:
       name: Dimming Direction
       description: Direction to dim when holding the button
@@ -83,7 +82,7 @@ max: 3
 
 variables:
   message_type: !input message_type
-  target_lights: !input target_lights
+  target_light: !input target_light
   dimming_direction: !input dimming_direction
   dimming_step: !input dimming_step
   dimming_interval: !input dimming_interval
@@ -121,7 +120,7 @@ action:
         sequence:
           - service: light.toggle
             target:
-              entity_id: !input target_lights
+              entity_id: !input target_light
           # Reset helper after toggle
           - service: input_text.set_value
             target:
@@ -169,14 +168,13 @@ action:
               entity_id: !input button_state_helper
             data:
               value: >
-                {% set lights = target_lights if target_lights is string else target_lights | list %}
-                {% set first_light = lights if lights is string else lights[0] %}
+                {% set light_entity = target_light %}
                 {% set direction = dimming_direction | default('toggle') %}
                 {% if direction == 'down' %}
                   holding_down
                 {% elif direction == 'up' %}
                   holding_up
-                {% elif states(first_light) == 'on' and (state_attr(first_light, 'brightness') | int(0) > 127) %}
+                {% elif states(light_entity) == 'on' and (state_attr(light_entity, 'brightness') | int(0) > 127) %}
                   holding_down
                 {% else %}
                   holding_up
@@ -190,12 +188,11 @@ action:
                     {{ states(button_state_helper) in ['holding_up', 'holding_down'] }}
               sequence:
                 - variables:
-                    lights: "{{ target_lights if target_lights is string else target_lights | list }}"
-                    first_light: "{{ lights if lights is string else lights[0] }}"
+                    light_entity: !input target_light
                     helper_state: "{{ states(button_state_helper) }}"
                     dimming_step_value: !input dimming_step
                     step_pct: "{{ (dimming_step_value | default(25) / 255 * 100) | round(1) }}"
-                    current_brightness: "{{ state_attr(first_light, 'brightness') | int(255) }}"
+                    current_brightness: "{{ state_attr(light_entity, 'brightness') | int(255) }}"
                     calculated_step: >
                       {% if helper_state == 'holding_down' %}
                         {% if current_brightness > 16 %}
@@ -209,7 +206,7 @@ action:
                 
                 - service: light.turn_on
                   target:
-                    entity_id: !input target_lights
+                    entity_id: !input target_light
                   data:
                     brightness_step_pct: "{{ calculated_step }}"
                     transition: >

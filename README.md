@@ -20,10 +20,43 @@ Switch button press/release events are fired as Home Assistant events that can b
     - `"button_press"` - Initial button press
     - `"button_hold"` - Sent continuously while button is held down
     - `"button_release"` - Quick press and release
-    - `"button_release_after_hold"` - Release after holding (also fires a compatibility `button_release` event)
+    - `"button_release_after_hold"` - Release after holding
   - `message_type`: Raw message type from the device
   - `flags`: Additional flags from the message
-  - `original_action`: (Only in compatibility events) The original action before compatibility mapping
+
+### Button Hold Timing
+- **Press to Hold Delay**: Approximately 500-600ms
+  - Short press (< 500ms): Fires `button_press` followed by `button_release`
+  - Long press (> 500ms): Fires `button_press`, then `button_hold` events start after ~500ms, finally `button_release_after_hold` when released
+- **Hold Event Frequency**: `button_hold` events fire continuously but at irregular intervals while the button is held
+  - Each hold event has a unique payload (incrementing counter), so they are not filtered as duplicates
+  - The integration only filters truly duplicate packets with identical payloads within a 10-second window
+
+### Automation Blueprints
+
+This integration includes several automation blueprints to make it easy to set up switch button automations:
+
+1. **Casambi Button Press Action** - Simple action on button press/release
+2. **Casambi Button Hold Dimming** - Dim lights while holding a button (requires an input_text helper to track button state)
+3. **Casambi Button Short/Long Press Actions** - Different actions for short vs long press
+
+To use these blueprints:
+1. After installing the integration, blueprints are automatically available
+2. Go to Settings → Automations & Scenes → Blueprints
+3. Find them under the "Casambi Bluetooth" category
+4. Click on a blueprint to create an automation from it
+
+**For the Button Hold Dimming blueprint:**
+- First create an input_text helper: Settings → Devices & Services → Helpers → Create Helper → Text
+- Name it something like "casambi_button_123_0_state" (for unit 123, button 0)
+- Use this helper in the blueprint configuration
+
+Note: If you installed via HACS, blueprints are included. For manual installation, copy the `blueprints` folder to your Home Assistant config directory.
+
+All blueprints include:
+- Optional message type filtering (useful if your switch sends different types)
+- Configurable debounce time to prevent duplicate triggers
+- Clear descriptions for each setting
 
 ### Example Automations
 
@@ -50,50 +83,62 @@ automation:
           entity_id: light.living_room
 ```
 
-#### Dimming with Hold
+#### Dimming with Hold (Single Automation with Helper)
 ```yaml
+# First create an input_text helper for button state tracking:
+# Settings → Devices & Services → Helpers → Create Helper → Text
+
 automation:
   - alias: "Casambi Switch Dimming"
-    mode: restart  # Restart if triggered again while running
+    mode: parallel  # Allow multiple instances
     trigger:
       - platform: event
         event_type: casambi_bt_switch_event
         event_data:
           unit_id: 123  # Your switch unit ID
           button: 0     # Button number (0-based)
-          action: button_hold
+    condition:
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.action in ['button_hold', 'button_release_after_hold'] }}
     action:
-      - repeat:
-          while:
-            - condition: template
-              value_template: "{{ true }}"  # Continues until automation is stopped
-          sequence:
-            - service: light.turn_on
-              target:
-                entity_id: light.living_room
-              data:
-                brightness: >
-                  {% set current = state_attr('light.living_room', 'brightness') | default(0) %}
-                  {% set new = current + 10 %}
-                  {{ [new, 255] | min }}
-            - delay:
-                milliseconds: 200
-
-  - alias: "Stop Dimming on Release"
-    trigger:
-      - platform: event
-        event_type: casambi_bt_switch_event
-        event_data:
-          unit_id: 123
-          button: 0
-          action: button_release_after_hold
-    action:
-      - service: automation.turn_off
-        entity_id: automation.casambi_switch_dimming
-      - delay:
-          seconds: 1
-      - service: automation.turn_on
-        entity_id: automation.casambi_switch_dimming
+      - choose:
+          # Update helper on release
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.event.data.action == 'button_release_after_hold' }}"
+            sequence:
+              - service: input_text.set_value
+                target:
+                  entity_id: input_text.casambi_button_state
+                data:
+                  value: "released"
+          # Start dimming on hold
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.event.data.action == 'button_hold' }}"
+            sequence:
+              - service: input_text.set_value
+                target:
+                  entity_id: input_text.casambi_button_state
+                data:
+                  value: "holding"
+              - repeat:
+                  while:
+                    - condition: state
+                      entity_id: input_text.casambi_button_state
+                      state: "holding"
+                  sequence:
+                    - service: light.turn_on
+                      target:
+                        entity_id: light.living_room
+                      data:
+                        brightness: >
+                          {% set current = state_attr('light.living_room', 'brightness') | default(0) %}
+                          {% set new = current + 10 %}
+                          {{ [new, 255] | min }}
+                    - delay:
+                        milliseconds: 200
 ```
 
 #### Different Actions for Short Press vs Long Press
@@ -106,11 +151,7 @@ automation:
         event_data:
           unit_id: 123
           button: 0
-          action: button_release  # Quick press/release
-    condition:
-      - condition: template
-        value_template: >
-          {{ trigger.event.data.get('original_action') != 'button_release_after_hold' }}
+          action: button_release  # Only triggered on quick press/release
     action:
       - service: light.toggle
         entity_id: light.living_room
@@ -122,10 +163,42 @@ automation:
         event_data:
           unit_id: 123
           button: 0
-          action: button_release_after_hold
+          action: button_release_after_hold  # Only triggered after holding
     action:
       - service: scene.turn_on
         entity_id: scene.movie_time
+```
+
+#### Reliable Short Press (handles missed button_press events)
+```yaml
+automation:
+  - alias: "Casambi Switch Toggle Light"
+    mode: single
+    trigger:
+      # Trigger on both press and release for reliability
+      - platform: event
+        event_type: casambi_bt_switch_event
+        event_data:
+          unit_id: 123
+          button: 0
+          action: button_press
+      - platform: event
+        event_type: casambi_bt_switch_event
+        event_data:
+          unit_id: 123
+          button: 0
+          action: button_release
+    condition:
+      # Prevent double triggers and ignore release after hold
+      - condition: template
+        value_template: >
+          {{ 
+            (trigger.event.data.action != 'button_release' or 
+             (as_timestamp(now()) - as_timestamp(this.attributes.last_triggered | default(0))) > 2)
+          }}
+    action:
+      - service: light.toggle
+        entity_id: light.living_room
 ```
 
 ### Listening to Events
@@ -164,7 +237,10 @@ This is the most reliable way to identify button mappings for your specific swit
 The Casambi protocol may send multiple duplicate event packets for reliability. You'll need to implement debouncing in your automations to handle this. See the example automation above which includes a 2-second cooldown period to prevent duplicate triggers.
 
 #### Event Reliability
-Button press and release events are **not guaranteed** to be captured due to the nature of Bluetooth communication. For better reliability, it's recommended to trigger automations on both `button_press` and `button_release` events rather than relying on just one type.
+Button press and release events are **not guaranteed** to be captured due to the nature of Bluetooth communication:
+- Sometimes `button_press` events may be missed entirely
+- For better reliability, consider triggering automations on both `button_press` and `button_release` events
+- Be aware that `button_release` fires for short presses while `button_release_after_hold` fires for long presses - they are distinct events
 
 ### Example Event Data
 Here are examples of different switch events in Home Assistant:
@@ -208,19 +284,6 @@ data:
 origin: LOCAL
 ```
 
-#### Compatibility Event (automatically fired with button_release_after_hold)
-```yaml
-event_type: casambi_bt_switch_event
-data:
-  entry_id: fc8461de92e186495147fdb327fddea9
-  unit_id: 31
-  button: 0
-  action: button_release
-  original_action: button_release_after_hold  # Indicates this is a compatibility event
-  message_type: 16
-  flags: 2
-origin: LOCAL
-```
 
 # Home Assistant integration for Casambi using Bluetooth
 

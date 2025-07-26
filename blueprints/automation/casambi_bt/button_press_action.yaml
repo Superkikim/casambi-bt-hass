@@ -1,0 +1,96 @@
+blueprint:
+  name: Casambi Button Press Action
+  description: Trigger an action when a Casambi switch button is pressed
+  domain: automation
+  input:
+    unit_id:
+      name: Unit ID
+      description: The Casambi unit ID of your switch (found in Casambi app → More → Switches → Your Switch → Details)
+      selector:
+        number:
+          mode: box
+    button:
+      name: Button Number
+      description: Button number (0-based). Press the button and check Developer Tools → Events to find the correct number
+      default: 0
+      selector:
+        number:
+          mode: box
+    message_type:
+      name: Message Type (Optional)
+      description: Filter by message type. Leave empty to accept any message type. Common values are 8 and 16
+      default: ""
+      selector:
+        text:
+    trigger_on:
+      name: Trigger On
+      description: Which event to trigger on
+      default: button_press
+      selector:
+        select:
+          options:
+            - label: "Button Press"
+              value: "button_press"
+            - label: "Button Release"
+              value: "button_release"
+            - label: "Both (More Reliable)"
+              value: "both"
+    debounce_time:
+      name: Debounce Time
+      description: Minimum seconds between triggers (prevents duplicate actions)
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.5
+          unit_of_measurement: seconds
+    action:
+      name: Action
+      description: Action to perform when the button is pressed
+      selector:
+        action: {}
+
+mode: single
+max_exceeded: silent
+
+variables:
+  trigger_on: !input trigger_on
+  message_type: !input message_type
+  debounce_time: !input debounce_time
+
+trigger:
+  - platform: event
+    event_type: casambi_bt_switch_event
+    event_data:
+      unit_id: !input unit_id
+      button: !input button
+
+condition:
+  - condition: template
+    value_template: >
+      {% set trigger_on = trigger_on | default('button_press') %}
+      {% set message_type_filter = message_type | default('') %}
+      {% set event_action = trigger.event.data.action %}
+      {% set event_message_type = trigger.event.data.message_type | string %}
+      {% set debounce = debounce_time | default(2) %}
+      
+      {# Check if action matches what we want to trigger on #}
+      {% set action_match = 
+        (trigger_on == 'both' and event_action in ['button_press', 'button_release']) or
+        (trigger_on == event_action)
+      %}
+      
+      {# Check if message type matches (if filter is set) #}
+      {% set message_type_match = 
+        (message_type_filter == '') or 
+        (message_type_filter == event_message_type)
+      %}
+      
+      {# Check debounce time #}
+      {% set last_triggered = as_timestamp(state_attr(this.entity_id, 'last_triggered') | default(0)) %}
+      {% set time_passed = as_timestamp(now()) - last_triggered %}
+      
+      {{ action_match and message_type_match and (time_passed > debounce) }}
+
+action: !input action

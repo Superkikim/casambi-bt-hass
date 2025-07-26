@@ -1,0 +1,118 @@
+blueprint:
+  name: Casambi Button Short/Long Press Actions
+  description: Different actions for short press vs long press on a Casambi switch button
+  domain: automation
+  input:
+    unit_id:
+      name: Unit ID
+      description: The Casambi unit ID of your switch
+      selector:
+        number:
+          mode: box
+    button:
+      name: Button Number
+      description: Button number (0-based)
+      default: 0
+      selector:
+        number:
+          mode: box
+    message_type_short:
+      name: Message Type for Short Press (Optional)
+      description: Filter by message type for short press. Leave empty for any
+      default: ""
+      selector:
+        text:
+    message_type_long:
+      name: Message Type for Long Press (Optional)
+      description: Filter by message type for long press. Leave empty for any. Usually type 16
+      default: "16"
+      selector:
+        text:
+    short_press_action:
+      name: Short Press Action
+      description: Action to perform on short press (quick press and release)
+      selector:
+        action: {}
+    long_press_action:
+      name: Long Press Action
+      description: Action to perform on long press (hold for >500ms then release)
+      selector:
+        action: {}
+    debounce_time:
+      name: Debounce Time
+      description: Minimum seconds between triggers
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.5
+          unit_of_measurement: seconds
+
+mode: queued
+max: 2
+
+variables:
+  message_type_short: !input message_type_short
+  message_type_long: !input message_type_long
+  debounce_time: !input debounce_time
+
+trigger:
+  - platform: event
+    event_type: casambi_bt_switch_event
+    event_data:
+      unit_id: !input unit_id
+      button: !input button
+
+condition:
+  - condition: template
+    value_template: >
+      {% set event_action = trigger.event.data.action %}
+      {% set event_message_type = trigger.event.data.message_type | string %}
+      {% set debounce = debounce_time | default(2) %}
+      {% set last_triggered = as_timestamp(state_attr(this.entity_id, 'last_triggered') | default(0)) %}
+      {% set time_passed = as_timestamp(now()) - last_triggered %}
+      
+      {# Must be a release event #}
+      {% set is_release = event_action in ['button_release', 'button_release_after_hold'] %}
+      
+      {# Check debounce #}
+      {% set debounce_ok = time_passed > debounce %}
+      
+      {{ is_release and debounce_ok }}
+
+action:
+  - choose:
+      # Short press
+      - conditions:
+          - condition: template
+            value_template: >
+              {% set event_action = trigger.event.data.action %}
+              {% set event_message_type = trigger.event.data.message_type | string %}
+              {% set message_type_filter = message_type_short | default('') %}
+              
+              {% set is_short_press = event_action == 'button_release' %}
+              {% set message_type_match = 
+                (message_type_filter == '') or 
+                (message_type_filter == event_message_type)
+              %}
+              
+              {{ is_short_press and message_type_match }}
+        sequence: !input short_press_action
+      
+      # Long press
+      - conditions:
+          - condition: template
+            value_template: >
+              {% set event_action = trigger.event.data.action %}
+              {% set event_message_type = trigger.event.data.message_type | string %}
+              {% set message_type_filter = message_type_long | default('') %}
+              
+              {% set is_long_press = event_action == 'button_release_after_hold' %}
+              {% set message_type_match = 
+                (message_type_filter == '') or 
+                (message_type_filter == event_message_type)
+              %}
+              
+              {{ is_long_press and message_type_match }}
+        sequence: !input long_press_action

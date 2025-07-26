@@ -1,0 +1,176 @@
+blueprint:
+  name: Casambi Button Hold Dimming
+  description: Dim lights while holding a Casambi switch button (uses helper to track button state)
+  domain: automation
+  input:
+    unit_id:
+      name: Unit ID
+      description: The Casambi unit ID of your switch
+      selector:
+        number:
+          mode: box
+    button:
+      name: Button Number
+      description: Button number (0-based)
+      default: 0
+      selector:
+        number:
+          mode: box
+    message_type:
+      name: Message Type (Optional)
+      description: Filter by message type. Leave empty to accept any. Usually type 16 for hold events
+      default: "16"
+      selector:
+        text:
+    target_light:
+      name: Target Light
+      description: The light to control
+      selector:
+        entity:
+          domain: light
+    dimming_direction:
+      name: Dimming Direction
+      description: Direction to dim when holding the button
+      default: toggle
+      selector:
+        select:
+          options:
+            - label: "Increase Brightness"
+              value: "up"
+            - label: "Decrease Brightness"
+              value: "down"
+            - label: "Toggle Direction (if brightness > 50% dim down, otherwise dim up)"
+              value: "toggle"
+    dimming_step:
+      name: Dimming Step
+      description: How much to change brightness each step (0-255)
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: slider
+    dimming_interval:
+      name: Dimming Interval
+      description: Milliseconds between each dimming step
+      default: 200
+      selector:
+        number:
+          min: 50
+          max: 1000
+          step: 50
+          unit_of_measurement: ms
+    button_state_helper:
+      name: Button State Helper
+      description: Input text helper to track button state (create one per button you want to control)
+      selector:
+        entity:
+          domain: input_text
+
+mode: parallel  # Allow multiple instances
+max: 3
+
+variables:
+  message_type: !input message_type
+  target_light: !input target_light
+  dimming_direction: !input dimming_direction
+  dimming_step: !input dimming_step
+  dimming_interval: !input dimming_interval
+  button_state_helper: !input button_state_helper
+
+trigger:
+  - platform: event
+    event_type: casambi_bt_switch_event
+    event_data:
+      unit_id: !input unit_id
+      button: !input button
+
+condition:
+  - condition: template
+    value_template: >
+      {% set message_type_filter = message_type | default('') %}
+      {% set event_message_type = trigger.event.data.message_type | string %}
+      {% set event_action = trigger.event.data.action %}
+      {% set message_match = (message_type_filter == '') or (message_type_filter == event_message_type) %}
+      
+      {# Accept hold events or release_after_hold #}
+      {{ message_match and event_action in ['button_hold', 'button_release_after_hold'] }}
+
+action:
+  - choose:
+      # Handle button release - just update the helper
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.action == 'button_release_after_hold' }}"
+        sequence:
+          - service: input_text.set_value
+            target:
+              entity_id: !input button_state_helper
+            data:
+              value: "released"
+      
+      # Handle button hold - update helper and start dimming loop
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.action == 'button_hold' }}"
+        sequence:
+          # Update button state to holding
+          - service: input_text.set_value
+            target:
+              entity_id: !input button_state_helper
+            data:
+              value: "holding"
+          
+          # Turn on the light if it's off
+          - if:
+              - condition: state
+                entity_id: !input target_light
+                state: "off"
+            then:
+              - service: light.turn_on
+                target:
+                  entity_id: !input target_light
+                data:
+                  brightness: 10  # Start at low brightness
+                  transition: >
+                    {{ (dimming_interval | default(200)) / 1000 }}
+          
+          # Start dimming loop
+          - repeat:
+              while:
+                # Continue while button is still being held
+                - condition: state
+                  entity_id: !input button_state_helper
+                  state: "holding"
+              sequence:
+                # Adjust brightness
+                - service: light.turn_on
+                  target:
+                    entity_id: !input target_light
+                  data:
+                    brightness: >
+                      {% set light_entity = target_light %}
+                      {% set current = state_attr(light_entity, 'brightness') | default(128) %}
+                      {% set step = dimming_step | default(10) %}
+                      {% set direction = dimming_direction | default('toggle') %}
+                      {% set helper = button_state_helper %}
+                      
+                      {# For toggle mode, determine direction based on current brightness #}
+                      {% if direction == 'toggle' %}
+                        {# Simple rule: if brightness > 50%, dim down, otherwise dim up #}
+                        {% set going_up = current <= 127 %}
+                      {% else %}
+                        {% set going_up = direction == 'up' %}
+                      {% endif %}
+                      
+                      {% if going_up %}
+                        {{ [current + step, 255] | min }}
+                      {% else %}
+                        {{ [current - step, 1] | max }}
+                      {% endif %}
+                    transition: >
+                      {{ (dimming_interval | default(200)) / 1000 }}
+                
+                # Wait before next step
+                - delay:
+                    milliseconds: !input dimming_interval

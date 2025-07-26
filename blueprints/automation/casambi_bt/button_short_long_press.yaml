@@ -1,6 +1,6 @@
 blueprint:
-  name: Casambi Button Customizable Actions
-  description: Customizable actions for button press and hold events
+  name: Casambi Button Actions
+  description: Versatile button automation with customizable actions for different button events
   domain: automation
   input:
     unit_id:
@@ -16,45 +16,94 @@ blueprint:
       selector:
         number:
           mode: box
-    message_type_short:
-      name: Message Type for Short Press (Optional)
-      description: Filter by message type for short press. Leave empty for any
+    message_type:
+      name: Message Type Filter (Optional)
+      description: Filter by message type. Leave empty to accept any
       default: ""
       selector:
         text:
-    message_type_long:
-      name: Message Type for Long Press (Optional)
-      description: Filter by message type for long press. Leave empty for any. Usually type 16
-      default: "16"
+    
+    # Button Press Action
+    button_press_action:
+      name: Button Press Action (Optional)
+      description: Action when button is initially pressed down
+      default: []
       selector:
-        text:
+        action: {}
+    
+    # Short Press Action (Press and Release)
     short_press_action:
-      name: Short Press Action
-      description: Action to perform on short press (quick press and release)
+      name: Short Press Action (Optional)
+      description: Action on quick press and release (< 500ms)
+      default: []
       selector:
         action: {}
-    long_press_action:
-      name: Long Press Action
-      description: Action to perform on long press (hold for >500ms then release)
+    
+    # Long Press Started Action
+    long_press_started_action:
+      name: Long Press Started Action (Optional)
+      description: Action when button hold is detected (after ~500ms)
+      default: []
       selector:
         action: {}
+    
+    # Long Press Released Action
+    long_press_released_action:
+      name: Long Press Released Action (Optional)
+      description: Action when button is released after long press
+      default: []
+      selector:
+        action: {}
+    
+    # Continuous Hold Action
+    hold_action:
+      name: Continuous Hold Action (Optional)
+      description: Action to repeat while button is held (requires helper)
+      default: []
+      selector:
+        action: {}
+    
+    # Helper for continuous hold
+    button_state_helper:
+      name: Button State Helper (Optional)
+      description: Input text helper for continuous hold actions. Only needed if using Continuous Hold Action
+      default: ""
+      selector:
+        entity:
+          domain: input_text
+    
+    # Hold repeat interval
+    hold_repeat_interval:
+      name: Hold Repeat Interval
+      description: Milliseconds between continuous hold action repeats
+      default: 200
+      selector:
+        number:
+          min: 50
+          max: 1000
+          step: 50
+          unit_of_measurement: ms
+    
+    # Debounce
     debounce_time:
       name: Debounce Time
-      description: Minimum seconds between triggers
-      default: 2
+      description: Minimum seconds between automation triggers
+      default: 0.5
       selector:
         number:
           min: 0
-          max: 10
-          step: 0.5
+          max: 5
+          step: 0.1
           unit_of_measurement: seconds
 
-mode: queued
-max: 2
+mode: parallel
+max: 3
 
 variables:
-  message_type_short: !input message_type_short
-  message_type_long: !input message_type_long
+  message_type: !input message_type
+  button_state_helper: !input button_state_helper
+  hold_action: !input hold_action
+  hold_repeat_interval: !input hold_repeat_interval
   debounce_time: !input debounce_time
 
 trigger:
@@ -67,52 +116,135 @@ trigger:
 condition:
   - condition: template
     value_template: >
-      {% set event_action = trigger.event.data.action %}
+      {% set message_type_filter = message_type | default('') %}
       {% set event_message_type = trigger.event.data.message_type | string %}
-      {% set debounce = debounce_time | default(2) %}
+      {% set event_action = trigger.event.data.action %}
+      {% set message_match = (message_type_filter == '') or (message_type_filter == event_message_type) %}
+      {% set debounce = debounce_time | default(0.5) %}
       {% set last_triggered = as_timestamp(state_attr(this.entity_id, 'last_triggered') | default(0)) %}
       {% set time_passed = as_timestamp(now()) - last_triggered %}
       
-      {# Must be a release event #}
-      {% set is_release = event_action in ['button_release', 'button_release_after_hold'] %}
-      
-      {# Check debounce #}
-      {% set debounce_ok = time_passed > debounce %}
-      
-      {{ is_release and debounce_ok }}
+      {{ message_match and time_passed > debounce }}
 
 action:
   - choose:
-      # Short press
+      # Button Press
       - conditions:
           - condition: template
-            value_template: >
-              {% set event_action = trigger.event.data.action %}
-              {% set event_message_type = trigger.event.data.message_type | string %}
-              {% set message_type_filter = message_type_short | default('') %}
-              
-              {% set is_short_press = event_action == 'button_release' %}
-              {% set message_type_match = 
-                (message_type_filter == '') or 
-                (message_type_filter == event_message_type)
-              %}
-              
-              {{ is_short_press and message_type_match }}
-        sequence: !input short_press_action
+            value_template: "{{ trigger.event.data.action == 'button_press' }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ button_press_action | length > 0 }}"
+                sequence: !input button_press_action
+          # Reset helper if provided
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ button_state_helper != '' }}"
+                sequence:
+                  - service: input_text.set_value
+                    target:
+                      entity_id: !input button_state_helper
+                    data:
+                      value: "pressed"
       
-      # Long press
+      # Short Press (Release)
       - conditions:
           - condition: template
             value_template: >
-              {% set event_action = trigger.event.data.action %}
-              {% set event_message_type = trigger.event.data.message_type | string %}
-              {% set message_type_filter = message_type_long | default('') %}
-              
-              {% set is_long_press = event_action == 'button_release_after_hold' %}
-              {% set message_type_match = 
-                (message_type_filter == '') or 
-                (message_type_filter == event_message_type)
-              %}
-              
-              {{ is_long_press and message_type_match }}
-        sequence: !input long_press_action
+              {{ trigger.event.data.action == 'button_release' and
+                 (button_state_helper == '' or 
+                  (states(button_state_helper) != 'holding' and 
+                   states(button_state_helper) != 'continuous_hold')) }}
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ short_press_action | length > 0 }}"
+                sequence: !input short_press_action
+          # Reset helper
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ button_state_helper != '' }}"
+                sequence:
+                  - service: input_text.set_value
+                    target:
+                      entity_id: !input button_state_helper
+                    data:
+                      value: "idle"
+      
+      # Long Press Started (Hold)
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.action == 'button_hold' }}"
+        sequence:
+          # Update helper
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ button_state_helper != '' }}"
+                sequence:
+                  - service: input_text.set_value
+                    target:
+                      entity_id: !input button_state_helper
+                    data:
+                      value: "holding"
+          
+          # Execute long press started action
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ long_press_started_action | length > 0 }}"
+                sequence: !input long_press_started_action
+          
+          # Start continuous hold if configured
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ hold_action | length > 0 and button_state_helper != '' }}"
+                sequence:
+                  - service: input_text.set_value
+                    target:
+                      entity_id: !input button_state_helper
+                    data:
+                      value: "continuous_hold"
+                  - repeat:
+                      while:
+                        - condition: state
+                          entity_id: !input button_state_helper
+                          state: "continuous_hold"
+                      sequence:
+                        - choose:
+                            - conditions:
+                                - condition: template
+                                  value_template: "{{ hold_action | length > 0 }}"
+                              sequence: !input hold_action
+                        - delay:
+                            milliseconds: !input hold_repeat_interval
+      
+      # Long Press Released
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.action == 'button_release_after_hold' }}"
+        sequence:
+          # Stop continuous hold
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ button_state_helper != '' }}"
+                sequence:
+                  - service: input_text.set_value
+                    target:
+                      entity_id: !input button_state_helper
+                    data:
+                      value: "released"
+          
+          # Execute long press released action
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ long_press_released_action | length > 0 }}"
+                sequence: !input long_press_released_action

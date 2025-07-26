@@ -9,17 +9,19 @@ This integration includes several automation blueprints to make it easy to set u
 
 [![Import Toggle and Dim Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_toggle_and_dim.yaml)
 
-### 2. Casambi Button Press Action
-Simple action on button press/release
+### 2. Casambi Button Actions
+**Versatile button automation** - Configure any combination of press, release, hold, and continuous actions
 
-[![Import Button Press Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_press_action.yaml)
+[![Import Button Actions Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_short_long_press.yaml)
 
-### 3. Casambi Button Customizable Actions
-Customizable actions for button press and hold events
+Available actions:
+- **Button Press**: When button is initially pressed
+- **Short Press**: Quick press and release (< 500ms)
+- **Long Press Started**: When hold is detected (~500ms)
+- **Long Press Released**: When button is released after hold
+- **Continuous Hold**: Repeating action while held (requires helper)
 
-[![Import Short/Long Press Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_short_long_press.yaml)
-
-### 4. Casambi Button Cover Control
+### 3. Casambi Button Cover Control
 **Smart blind/cover control** - Short press to open/close/stop, hold for continuous movement
 
 [![Import Cover Control Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_cover_control.yaml)

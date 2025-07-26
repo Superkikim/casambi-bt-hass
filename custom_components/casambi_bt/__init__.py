@@ -47,6 +47,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register switch event handler that fires Home Assistant events
     def handle_switch_event(event_data: dict) -> None:
         """Fire a Home Assistant event when a switch is pressed/released."""
+        # Convert any bytes objects to hex strings for JSON serialization
+        raw_packet = event_data.get("raw_packet")
+        decrypted_data = event_data.get("decrypted_data")
+        payload_hex = event_data.get("payload_hex")
+        extra_data = event_data.get("extra_data")
+        
         hass.bus.async_fire(
             f"{DOMAIN}_switch_event",
             {
@@ -57,11 +63,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "message_type": event_data.get("message_type"),
                 "flags": event_data.get("flags"),
                 "packet_sequence": event_data.get("packet_sequence"),
-                "raw_packet": event_data.get("raw_packet"),
-                "decrypted_data": event_data.get("decrypted_data"),
+                "raw_packet": raw_packet.hex() if isinstance(raw_packet, bytes) else raw_packet,
+                "decrypted_data": decrypted_data.hex() if isinstance(decrypted_data, bytes) else decrypted_data,
                 "message_position": event_data.get("message_position"),
-                "payload_hex": event_data.get("payload_hex"),
-                "extra_data": event_data.get("extra_data").hex() if event_data.get("extra_data") else None,
+                "payload_hex": payload_hex.hex() if isinstance(payload_hex, bytes) else payload_hex,
+                "extra_data": extra_data.hex() if isinstance(extra_data, bytes) else None,
             }
         )
         _LOGGER.debug(
@@ -71,7 +77,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             event_data.get('button'),
             event_data.get('event'),
             event_data.get('packet_sequence'),
-            (event_data.get('raw_packet')[:20] + '...') if event_data.get('raw_packet') else 'None'
+            (raw_packet.hex()[:20] + '...') if raw_packet else 'None'
         )
 
     # Register the event handler if the library supports it

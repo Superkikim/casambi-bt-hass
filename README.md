@@ -37,17 +37,34 @@ Switch button press/release events are fired as Home Assistant events that can b
 This integration includes several automation blueprints to make it easy to set up switch button automations:
 
 1. **Casambi Button Press Action** - Simple action on button press/release
-2. **Casambi Button Hold Dimming** - Dim lights while holding a button (requires an input_text helper to track button state)
+   
+   [![Import Button Press Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_press_action.yaml)
+
+2. **Casambi Button Hold Dimming** - Dim lights while holding a button (requires an input_text helper)
+   
+   [![Import Button Hold Dimming Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_hold_dimming.yaml)
+
 3. **Casambi Button Short/Long Press Actions** - Different actions for short vs long press
+   
+   [![Import Short/Long Press Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_short_long_press.yaml)
 
 To use these blueprints:
 
-**For HACS installations:**
-1. After installing/updating the integration, restart Home Assistant
-2. The blueprints should appear in Settings → Automations & Scenes → Blueprints
-3. If blueprints don't appear, manually copy the `blueprints` folder from the integration to your HA config directory
+**Easy Method - Import Links:**
+1. Click any of the "Import Blueprint" buttons above
+2. This will open the blueprint import dialog in your Home Assistant
+3. Click "Preview Blueprint" and then "Import Blueprint"
+4. Create an automation from the imported blueprint
 
-**For manual installations:**
+**Alternative Method - Manual:**
+If the import buttons don't work or you prefer manual installation:
+
+For HACS installations:
+1. After installing/updating the integration, restart Home Assistant
+2. The blueprints may appear in Settings → Automations & Scenes → Blueprints
+3. If not, manually copy the `blueprints` folder to your HA config directory
+
+For manual installations:
 1. Copy BOTH folders to your Home Assistant config directory:
    - `custom_components/casambi_bt/` → `config/custom_components/casambi_bt/`
    - `blueprints/` → `config/blueprints/`

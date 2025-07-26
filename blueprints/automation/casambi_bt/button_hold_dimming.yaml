@@ -43,8 +43,8 @@ blueprint:
               value: "toggle"
     dimming_step:
       name: Dimming Step
-      description: How much to change brightness each step (0-255)
-      default: 10
+      description: How much to change brightness each step (0-255, will be converted to percentage)
+      default: 25
       selector:
         number:
           min: 1
@@ -121,57 +121,73 @@ action:
             data:
               value: "holding"
           
-          # Turn on the light if it's off
-          - if:
-              - condition: state
-                entity_id: !input target_light
-                state: "off"
-            then:
-              - service: light.turn_on
-                target:
-                  entity_id: !input target_light
-                data:
-                  brightness: 10  # Start at low brightness
-                  transition: >
-                    {{ (dimming_interval | default(200)) / 1000 }}
-          
-          # Start dimming loop
-          - repeat:
-              while:
-                # Continue while button is still being held
-                - condition: state
-                  entity_id: !input button_state_helper
-                  state: "holding"
-              sequence:
-                # Adjust brightness
-                - service: light.turn_on
-                  target:
-                    entity_id: !input target_light
-                  data:
-                    brightness: >
+          # Choose dimming direction based on current state
+          - choose:
+              # Dim down if light is on and brightness > 50%
+              - conditions:
+                  - condition: template
+                    value_template: >
                       {% set light_entity = target_light %}
-                      {% set current_brightness = state_attr(light_entity, 'brightness') %}
-                      {% set current = current_brightness if current_brightness is not none else 0 %}
-                      {% set step = dimming_step | default(10) %}
                       {% set direction = dimming_direction | default('toggle') %}
-                      {% set helper = button_state_helper %}
-                      
-                      {# For toggle mode, determine direction based on current brightness #}
-                      {% if direction == 'toggle' %}
-                        {# Simple rule: if brightness > 50%, dim down, otherwise dim up #}
-                        {% set going_up = current <= 127 %}
+                      {% if direction == 'down' %}
+                        true
+                      {% elif direction == 'up' %}
+                        false
                       {% else %}
-                        {% set going_up = direction == 'up' %}
+                        {{ states(light_entity) == 'on' and (state_attr(light_entity, 'brightness') | int(0) > 127) }}
                       {% endif %}
-                      
-                      {% if going_up %}
-                        {{ [current + step, 255] | min }}
+                sequence:
+                  - repeat:
+                      while:
+                        - condition: state
+                          entity_id: !input button_state_helper
+                          state: "holding"
+                      sequence:
+                        - service: light.turn_on
+                          target:
+                            entity_id: !input target_light
+                          data:
+                            brightness_step_pct: >
+                              {% set light_entity = target_light %}
+                              {% set step_pct = (dimming_step | default(10) / 255 * 100) | round(1) %}
+                              {% set current_brightness = state_attr(light_entity, 'brightness') | int(255) %}
+                              {% if current_brightness > 16 %}
+                                {{ -step_pct }}
+                              {% else %}
+                                {{ (1 - current_brightness) / 255 * 100 }}
+                              {% endif %}
+                            transition: >
+                              {{ (dimming_interval | default(200)) / 1000 }}
+                        - delay:
+                            milliseconds: !input dimming_interval
+              
+              # Dim up if light is off or brightness <= 50%
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {% set light_entity = target_light %}
+                      {% set direction = dimming_direction | default('toggle') %}
+                      {% if direction == 'up' %}
+                        true
+                      {% elif direction == 'down' %}
+                        false
                       {% else %}
-                        {{ [current - step, 1] | max }}
+                        {{ states(light_entity) == 'off' or (state_attr(light_entity, 'brightness') | int(0) <= 127) }}
                       {% endif %}
-                    transition: >
-                      {{ (dimming_interval | default(200)) / 1000 }}
-                
-                # Wait before next step
-                - delay:
-                    milliseconds: !input dimming_interval
+                sequence:
+                  - repeat:
+                      while:
+                        - condition: state
+                          entity_id: !input button_state_helper
+                          state: "holding"
+                      sequence:
+                        - service: light.turn_on
+                          target:
+                            entity_id: !input target_light
+                          data:
+                            brightness_step_pct: >
+                              {{ (dimming_step | default(10) / 255 * 100) | round(1) }}
+                            transition: >
+                              {{ (dimming_interval | default(200)) / 1000 }}
+                        - delay:
+                            milliseconds: !input dimming_interval

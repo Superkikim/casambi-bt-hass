@@ -1,6 +1,6 @@
 blueprint:
-  name: Casambi Button Short/Long Press Actions
-  description: Different actions for short press vs long press on a Casambi switch button
+  name: Casambi Button Customizable Actions
+  description: Customizable actions for button press and hold events
   domain: automation
   input:
     unit_id:

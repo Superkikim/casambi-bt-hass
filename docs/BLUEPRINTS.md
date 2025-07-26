@@ -14,17 +14,12 @@ Simple action on button press/release
 
 [![Import Button Press Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_press_action.yaml)
 
-### 3. Casambi Button Hold Dimming
-Dim lights while holding a button (requires an input_text helper)
-
-[![Import Button Hold Dimming Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_hold_dimming.yaml)
-
-### 4. Casambi Button Short/Long Press Actions
-Different actions for short vs long press
+### 3. Casambi Button Customizable Actions
+Customizable actions for button press and hold events
 
 [![Import Short/Long Press Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_short_long_press.yaml)
 
-### 5. Casambi Button Cover Control
+### 4. Casambi Button Cover Control
 **Smart blind/cover control** - Short press to open/close/stop, hold for continuous movement
 
 [![Import Cover Control Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Frankjie%2Fcasambi-bt-hass%2Fmain%2Fblueprints%2Fautomation%2Fcasambi_bt%2Fbutton_cover_control.yaml)
@@ -54,11 +49,11 @@ If the import buttons don't work or you prefer manual installation:
 
 ## Blueprint Configuration
 
-### Button Hold Dimming Setup
-1. First create an input_text helper:
-   - Go to Settings → Devices & Services → Helpers → Create Helper → Text
-   - Name it something like "casambi_button_123_0_state" (for unit 123, button 0)
-2. Use this helper in the blueprint configuration when setting up the automation
+### Helper Setup for Dimming/Cover Control
+For blueprints that support continuous actions (Toggle and Dim, Cover Control), you need to create an input_text helper:
+1. Go to Settings → Devices & Services → Helpers → Create Helper → Text
+2. Name it something like "casambi_button_123_0_state" (for unit 123, button 0)
+3. Use this helper in the blueprint configuration when setting up the automation
 
 ### Common Blueprint Features
 All blueprints include:

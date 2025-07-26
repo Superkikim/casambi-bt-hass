@@ -20,9 +20,10 @@ Switch button press/release events are fired as Home Assistant events that can b
 - **Press to Hold Delay**: Approximately 500-600ms
   - Short press (< 500ms): Fires `button_press` followed by `button_release`
   - Long press (> 500ms): Fires `button_press`, then `button_hold` events start after ~500ms, finally `button_release_after_hold` when released
-- **Hold Event Frequency**: `button_hold` events fire continuously but at irregular intervals while the button is held
-  - Each hold event has a unique payload (incrementing counter), so they are not filtered as duplicates
-  - The integration only filters truly duplicate packets with identical payloads within a 10-second window
+- **Hold Event Frequency**: `button_hold` events are filtered as duplicates
+  - Even though the Casambi protocol sends multiple hold events with incrementing counters, the integration filters them
+  - Only the first `button_hold` event is fired to Home Assistant
+  - This is why the dimming blueprint needs to use a loop rather than relying on multiple hold events
 
 ## Listening to Events
 You can monitor these events in Developer Tools → Events → Listen to events by entering `casambi_bt_switch_event` as the event type.

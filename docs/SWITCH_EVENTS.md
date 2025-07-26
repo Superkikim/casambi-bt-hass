@@ -42,20 +42,31 @@ You can monitor these events in Developer Tools → Events → Listen to events 
 - Have multiple ways to control your devices
 
 ### Finding Your Switch Configuration
-To identify your switch's unit ID:
+
+#### Method 1: Using Home Assistant Developer Tools (Recommended)
+1. Go to **Developer Tools → Events** in Home Assistant
+2. In the "Listen to events" section, enter: `casambi_bt_switch_event`
+3. Click "Start listening"
+4. Press the physical button on your switch
+5. Check the captured event data for:
+   - `unit_id`: The switch's unit ID
+   - `button`: The button number (0-based)
+   - `action`: The event type (button_press, button_release, etc.)
+
+**Important Notes about Different Switch Types:**
+- **Wired Relays** (e.g., SC-TI-CAS, LD220WCM): Generate clean, expected events
+- **Battery Switches** (e.g., 4CHANNEL_SW EVO): May trigger additional events with random metadata due to unknown protocol specifications - simply ignore the excessive events
+
+#### Method 2: Verifying Unit ID in Casambi App
+If you see multiple events with different `unit_id` values, verify the correct one:
 1. Open the Casambi app
-2. Go to More → Switches
+2. Go to **More → Switches**
 3. Select your switch
-4. Tap Details → Note the Unit ID
+4. Tap **Details**
+5. Note the **Unit ID** shown
+6. Use this Unit ID to filter the correct events in Home Assistant
 
-**Identifying Button Numbers**: Due to potential parsing differences, the button number shown in Home Assistant events may not directly match the Casambi app numbering. To find the correct button number for your automations:
-1. Go to Developer Tools → Events in Home Assistant
-2. Start listening for `casambi_bt_switch_event`
-3. Press the physical button on your switch
-4. Check the captured event data for the actual `button` value
-5. Use this value in your automations
-
-This is the most reliable way to identify button mappings for your specific switch model.
+**Button Number Mapping**: The button number in Home Assistant events (0-based) may not directly match the Casambi app numbering. Always test each physical button and note its corresponding `button` value in the events.
 
 ### Handling Duplicate Events
 The Casambi protocol may send multiple duplicate event packets for reliability. You'll need to implement debouncing in your automations to handle this. See the example automation below which includes a 2-second cooldown period to prevent duplicate triggers.

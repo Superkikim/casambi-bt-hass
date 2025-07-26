@@ -59,8 +59,8 @@ For blueprints that support continuous actions (Toggle and Dim, Cover Control), 
 
 ### Common Blueprint Features
 All blueprints include:
-- **Unit ID input**: Your switch's unit ID (found in Casambi app)
-- **Button number**: 0-based button index
+- **Unit ID input**: Your switch's unit ID (see [how to find it](SWITCH_EVENTS.md#finding-your-switch-configuration))
+- **Button number**: 0-based button index (test each button to find its number)
 - **Message type filtering**: Optional, leave empty to accept any type
 - **Debounce time**: Prevents duplicate triggers
 

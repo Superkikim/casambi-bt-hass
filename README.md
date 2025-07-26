@@ -41,17 +41,23 @@ This integration includes several automation blueprints to make it easy to set u
 3. **Casambi Button Short/Long Press Actions** - Different actions for short vs long press
 
 To use these blueprints:
-1. After installing the integration, blueprints are automatically available
-2. Go to Settings → Automations & Scenes → Blueprints
-3. Find them under the "Casambi Bluetooth" category
-4. Click on a blueprint to create an automation from it
+
+**For HACS installations:**
+1. After installing/updating the integration, restart Home Assistant
+2. The blueprints should appear in Settings → Automations & Scenes → Blueprints
+3. If blueprints don't appear, manually copy the `blueprints` folder from the integration to your HA config directory
+
+**For manual installations:**
+1. Copy BOTH folders to your Home Assistant config directory:
+   - `custom_components/casambi_bt/` → `config/custom_components/casambi_bt/`
+   - `blueprints/` → `config/blueprints/`
+2. Restart Home Assistant
+3. Go to Settings → Automations & Scenes → Blueprints
 
 **For the Button Hold Dimming blueprint:**
 - First create an input_text helper: Settings → Devices & Services → Helpers → Create Helper → Text
 - Name it something like "casambi_button_123_0_state" (for unit 123, button 0)
 - Use this helper in the blueprint configuration
-
-Note: If you installed via HACS, blueprints are included. For manual installation, copy the `blueprints` folder to your Home Assistant config directory.
 
 All blueprints include:
 - Optional message type filtering (useful if your switch sends different types)

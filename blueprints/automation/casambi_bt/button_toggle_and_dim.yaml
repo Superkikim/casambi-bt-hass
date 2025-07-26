@@ -26,9 +26,9 @@ blueprint:
       name: Target Lights
       description: The lights to control (select one or more)
       selector:
-        target:
-          entity:
-            domain: light
+        entity:
+          domain: light
+          multiple: true
     dimming_direction:
       name: Dimming Direction
       description: Direction to dim when holding the button
@@ -120,7 +120,8 @@ action:
                    states(button_state_helper) != 'holding_down')) }}
         sequence:
           - service: light.toggle
-            target: !input target_lights
+            target:
+              entity_id: !input target_lights
           # Reset helper after toggle
           - service: input_text.set_value
             target:
@@ -168,7 +169,7 @@ action:
               entity_id: !input button_state_helper
             data:
               value: >
-                {% set lights = target_lights.entity_id if target_lights.entity_id is string else target_lights.entity_id | list %}
+                {% set lights = target_lights if target_lights is string else target_lights | list %}
                 {% set first_light = lights if lights is string else lights[0] %}
                 {% set direction = dimming_direction | default('toggle') %}
                 {% if direction == 'down' %}
@@ -189,7 +190,7 @@ action:
                     {{ states(button_state_helper) in ['holding_up', 'holding_down'] }}
               sequence:
                 - variables:
-                    lights: "{{ target_lights.entity_id if target_lights.entity_id is string else target_lights.entity_id | list }}"
+                    lights: "{{ target_lights if target_lights is string else target_lights | list }}"
                     first_light: "{{ lights if lights is string else lights[0] }}"
                     helper_state: "{{ states(button_state_helper) }}"
                     dimming_step_value: !input dimming_step
@@ -207,7 +208,8 @@ action:
                       {% endif %}
                 
                 - service: light.turn_on
-                  target: !input target_lights
+                  target:
+                    entity_id: !input target_lights
                   data:
                     brightness_step_pct: "{{ calculated_step }}"
                     transition: >

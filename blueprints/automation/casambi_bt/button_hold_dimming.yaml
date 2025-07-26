@@ -24,10 +24,12 @@ blueprint:
         text:
     target_light:
       name: Target Light
-      description: The light to control
+      description: The light or light group to control
       selector:
         entity:
-          domain: light
+          domain: 
+            - light
+            - group
     dimming_direction:
       name: Dimming Direction
       description: Direction to dim when holding the button

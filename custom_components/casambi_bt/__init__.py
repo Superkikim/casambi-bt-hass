@@ -48,7 +48,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Event deduplication cache: (unit_id, button, payload_hex) -> timestamp
     event_cache: dict[tuple[int, int, str], float] = {}
     DEDUP_WINDOW_SECONDS = 10.0
-    
+
     _LOGGER.info("Switch event deduplication enabled with %ss window", DEDUP_WINDOW_SECONDS)
 
     # Register switch event handler that fires Home Assistant events
@@ -59,23 +59,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         decrypted_data = event_data.get("decrypted_data")
         payload_hex = event_data.get("payload_hex")
         extra_data = event_data.get("extra_data")
-        
+
         # Convert payload_hex to string if it's bytes
         payload_hex_str = payload_hex.hex() if isinstance(payload_hex, bytes) else payload_hex
-        
+
         # Check for duplicate events
         unit_id = event_data.get("unit_id")
         button = event_data.get("button")
-        
+
         if unit_id is not None and button is not None and payload_hex_str:
             cache_key = (unit_id, button, payload_hex_str)
             current_time = time.time()
-            
+
             # Clean up old entries from cache
             for key in list(event_cache.keys()):
                 if current_time - event_cache[key] > DEDUP_WINDOW_SECONDS:
                     del event_cache[key]
-            
+
             # Check if this event was seen recently
             if cache_key in event_cache:
                 _LOGGER.debug(
@@ -84,10 +84,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     current_time - event_cache[cache_key]
                 )
                 return
-            
+
             # Record this event
             event_cache[cache_key] = current_time
-        
+
         hass.bus.async_fire(
             f"{DOMAIN}_switch_event",
             {

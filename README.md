@@ -4,6 +4,8 @@
 
 An enhanced fork of the [original Casambi Bluetooth integration](https://github.com/lkempf/casambi-bt-hass) by [@lkempf](https://github.com/lkempf), with additional features for better switch and relay support.
 
+> ⚠️ **DEVELOPMENT WARNING**: This repository is used as a development environment. Things might break at any moment. It's recommended to wait at least 1 day after a new release before updating to ensure stability. All stable changes will be merged back to the original repository.
+
 ## What's Enhanced
 
 - **Fixed relay status** - Properly reports the status of relay units

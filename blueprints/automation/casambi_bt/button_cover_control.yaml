@@ -139,6 +139,24 @@ action:
             data:
               value: "released"
       
+      # Handle button_release when stuck in holding state (for units that only send release events)
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.event.data.action == 'button_release' and 
+                 states(button_state_helper) in ['holding_open', 'holding_close'] }}
+        sequence:
+          # Stop the cover movement
+          - service: cover.stop_cover
+            target:
+              entity_id: !input target_cover
+          # Reset state
+          - service: input_text.set_value
+            target:
+              entity_id: !input button_state_helper
+            data:
+              value: "idle"
+      
       # Handle button hold - start opening or closing
       - conditions:
           - condition: template
@@ -176,3 +194,28 @@ action:
               - service: cover.close_cover
                 target:
                   entity_id: !input target_cover
+          
+          # Monitor cover position and reset state when fully open/closed
+          - repeat:
+              while:
+                - condition: template
+                  value_template: >
+                    {{ states(button_state_helper) in ['holding_open', 'holding_close'] }}
+              sequence:
+                - choose:
+                    # Check if fully open or closed
+                    - conditions:
+                        - condition: template
+                          value_template: >
+                            {% set position = state_attr(target_cover, 'current_position') | int(50) %}
+                            {% set is_open = states(target_cover) == 'open' %}
+                            {% set is_closed = states(target_cover) == 'closed' %}
+                            {{ (position >= 98 or is_open) or (position <= 2 or is_closed) }}
+                      sequence:
+                        - service: input_text.set_value
+                          target:
+                            entity_id: !input button_state_helper
+                          data:
+                            value: "idle"
+                - delay:
+                    milliseconds: 500

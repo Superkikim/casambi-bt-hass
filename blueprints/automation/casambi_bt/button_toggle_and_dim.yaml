@@ -128,6 +128,20 @@ action:
             data:
               value: "idle"
       
+      # Handle button_release when stuck in holding state (for units that only send release events)
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.event.data.action == 'button_release' and 
+                 states(button_state_helper) in ['holding_up', 'holding_down'] }}
+        sequence:
+          # Stop the dimming by resetting state
+          - service: input_text.set_value
+            target:
+              entity_id: !input button_state_helper
+            data:
+              value: "idle"
+      
       # Handle button press - just track state
       - conditions:
           - condition: template
@@ -185,7 +199,11 @@ action:
               while:
                 - condition: template
                   value_template: >
-                    {{ states(button_state_helper) in ['holding_up', 'holding_down'] }}
+                    {% set helper_state = states(button_state_helper) %}
+                    {% set brightness = state_attr(target_light, 'brightness') | int(0) %}
+                    {% set at_min = brightness <= 3 %}
+                    {% set at_max = brightness >= 252 %}
+                    {{ helper_state in ['holding_up', 'holding_down'] and not (at_min or at_max) }}
               sequence:
                 - variables:
                     light_entity: !input target_light
@@ -213,3 +231,17 @@ action:
                       {{ (dimming_interval | default(200)) / 1000 }}
                 - delay:
                     milliseconds: !input dimming_interval
+          
+          # Reset state if we hit the limits
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {% set brightness = state_attr(target_light, 'brightness') | int(0) %}
+                      {{ brightness <= 3 or brightness >= 252 }}
+                sequence:
+                  - service: input_text.set_value
+                    target:
+                      entity_id: !input button_state_helper
+                    data:
+                      value: "idle"

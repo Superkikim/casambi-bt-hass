@@ -30,10 +30,8 @@ You can monitor these events in Developer Tools → Events → Listen to events 
 ## Important Notes
 
 ### Message Types and Event Data
-- **Message Type 8**: Usually valid button press/release events
-- **Message Type 16**: Sometimes also valid events - verify by listening to actual events from your switch
-
-**Important**: The integration now correctly decodes switch events with proper button IDs that match what you see in the Casambi app. The improved parsing handles both standard firmware (lower nibble) and EVO firmware (upper nibble) switches automatically.
+- **Message Type 8**: Button press/release events
+- **Message Type 16**: Button hold events
 
 **Tip**: You can use the Casambi app to configure switch button actions while simultaneously listening to events in Home Assistant. This allows you to:
 - Use Casambi's built-in button assignments for some actions
@@ -52,10 +50,6 @@ You can monitor these events in Developer Tools → Events → Listen to events 
    - `button`: The button number (0-based)
    - `action`: The event type (button_press, button_release, etc.)
 
-**Important Notes about Switch Events:**
-- The integration now correctly extracts button IDs that match the Casambi app
-- Irrelevant notification events (button=0) are automatically filtered out
-- Both standard and EVO firmware switches are properly supported
 
 #### Method 2: Verifying Unit ID in Casambi App
 If you see multiple events with different `unit_id` values, verify the correct one:
@@ -64,7 +58,7 @@ If you see multiple events with different `unit_id` values, verify the correct o
 3. Select your switch
 4. Tap **Details**
 5. Note the **Unit ID** shown
-6. Use this Unit ID to filter the correct events in Home Assistant
+6. Use this Unit ID in your automations
 
 **Button Number Mapping**: The button number in Home Assistant events (0-based) may not directly match the Casambi app numbering. Always test each physical button and note its corresponding `button` value in the events.
 

@@ -1,14 +1,16 @@
 blueprint:
   name: Casambi Button Cover Control
-  description: Control blinds/covers - short press to open/close/stop, hold to open/close continuously - v1.2.0
+  description: Control blinds/covers - short press to open/close/stop, hold to open/close continuously - v1.3.0
   domain: automation
   input:
-    unit_id:
-      name: Unit ID
-      description: The Casambi unit ID of your switch
+    switch_sensor:
+      name: Switch
+      description: Select the Casambi switch (Last Event sensor)
       selector:
-        number:
-          mode: box
+        entity:
+          filter:
+            - integration: casambi_bt
+              domain: sensor
     button:
       name: Button Number
       description: Button number (0-based)
@@ -54,26 +56,26 @@ variables:
   button_state_helper: !input button_state_helper
 
 trigger:
-  - platform: event
-    event_type: casambi_bt_switch_event
-    event_data:
-      unit_id: !input unit_id
-      button: !input button
+  - platform: state
+    entity_id: !input switch_sensor
 
 condition:
   - condition: template
     value_template: >
+      {% set button_input = button | int %}
+      {% set sensor_button = trigger.to_state.attributes.button | default(-1) | int %}
+      {% set button_match = sensor_button == button_input %}
       {% set message_type_filter = message_type | default('') %}
-      {% set event_message_type = trigger.event.data.message_type | string %}
-      {% set event_action = trigger.event.data.action %}
+      {% set event_message_type = trigger.to_state.attributes.message_type | default('') | string %}
+      {% set event_action = trigger.to_state.attributes.action %}
       {% set message_match = (message_type_filter == '') or (message_type_filter == event_message_type) %}
       
       {# Accept all relevant button events #}
-      {{ message_match and event_action in ['button_press', 'button_release', 'button_hold', 'button_release_after_hold'] }}
+      {{ button_match and message_match and event_action in ['button_press', 'button_release', 'button_hold', 'button_release_after_hold'] }}
 
 action:
   - variables:
-      event_action: "{{ trigger.event.data.action }}"
+      event_action: "{{ trigger.to_state.attributes.action }}"
       current_state: "{{ states(button_state_helper) }}"
       is_holding: "{{ current_state == 'holding' }}"
       is_release_event: "{{ event_action in ['button_release', 'button_release_after_hold'] }}"
@@ -142,7 +144,7 @@ action:
       # Handle button hold - start opening or closing
       - conditions:
           - condition: template
-            value_template: "{{ trigger.event.data.action == 'button_hold' }}"
+            value_template: "{{ trigger.to_state.attributes.action == 'button_hold' }}"
         sequence:
           # Set state to holding
           - service: input_text.set_value

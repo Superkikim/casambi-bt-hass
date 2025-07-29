@@ -1,14 +1,16 @@
 blueprint:
   name: Casambi Button Actions
-  description: Versatile button automation with customizable actions for different button events - v1.1.0
+  description: Versatile button automation with customizable actions for different button events - v1.2.0
   domain: automation
   input:
-    unit_id:
-      name: Unit ID
-      description: The Casambi unit ID of your switch
+    switch_sensor:
+      name: Switch
+      description: Select the Casambi switch (Last Event sensor)
       selector:
-        number:
-          mode: box
+        entity:
+          filter:
+            - integration: casambi_bt
+              domain: sensor
     button:
       name: Button Number
       description: Button number (0-based)
@@ -107,31 +109,30 @@ variables:
   debounce_time: !input debounce_time
 
 trigger:
-  - platform: event
-    event_type: casambi_bt_switch_event
-    event_data:
-      unit_id: !input unit_id
-      button: !input button
+  - platform: state
+    entity_id: !input switch_sensor
 
 condition:
   - condition: template
     value_template: >
+      {% set button_input = button | int %}
+      {% set sensor_button = trigger.to_state.attributes.button | default(-1) | int %}
+      {% set button_match = sensor_button == button_input %}
       {% set message_type_filter = message_type | default('') %}
-      {% set event_message_type = trigger.event.data.message_type | string %}
-      {% set event_action = trigger.event.data.action %}
+      {% set event_message_type = trigger.to_state.attributes.message_type | default('') | string %}
       {% set message_match = (message_type_filter == '') or (message_type_filter == event_message_type) %}
       {% set debounce = debounce_time | default(0.5) %}
       {% set last_triggered = as_timestamp(state_attr(this.entity_id, 'last_triggered') | default(0)) %}
       {% set time_passed = as_timestamp(now()) - last_triggered %}
       
-      {{ message_match and time_passed > debounce }}
+      {{ button_match and message_match and time_passed > debounce }}
 
 action:
   - choose:
       # Button Press
       - conditions:
           - condition: template
-            value_template: "{{ trigger.event.data.action == 'button_press' }}"
+            value_template: "{{ trigger.to_state.attributes.action == 'button_press' }}"
         sequence:
           - choose:
               - conditions:
@@ -154,7 +155,7 @@ action:
       - conditions:
           - condition: template
             value_template: >
-              {{ trigger.event.data.action == 'button_release' and
+              {{ trigger.to_state.attributes.action == 'button_release' and
                  (button_state_helper == '' or 
                   (states(button_state_helper) != 'holding' and 
                    states(button_state_helper) != 'continuous_hold')) }}
@@ -179,7 +180,7 @@ action:
       # Long Press Started (Hold)
       - conditions:
           - condition: template
-            value_template: "{{ trigger.event.data.action == 'button_hold' }}"
+            value_template: "{{ trigger.to_state.attributes.action == 'button_hold' }}"
         sequence:
           # Update helper
           - choose:
@@ -228,7 +229,7 @@ action:
       # Long Press Released
       - conditions:
           - condition: template
-            value_template: "{{ trigger.event.data.action == 'button_release_after_hold' }}"
+            value_template: "{{ trigger.to_state.attributes.action == 'button_release_after_hold' }}"
         sequence:
           # Stop continuous hold
           - choose:
@@ -253,7 +254,7 @@ action:
       - conditions:
           - condition: template
             value_template: >
-              {{ trigger.event.data.action == 'button_release' and
+              {{ trigger.to_state.attributes.action == 'button_release' and
                  button_state_helper != '' and
                  states(button_state_helper) in ['holding', 'continuous_hold'] }}
         sequence:

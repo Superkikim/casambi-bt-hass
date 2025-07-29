@@ -108,44 +108,17 @@ condition:
       {{ message_match and event_action in ['button_press', 'button_release', 'button_hold', 'button_release_after_hold'] }}
 
 action:
+  - variables:
+      event_action: "{{ trigger.event.data.action }}"
+      current_state: "{{ states(button_state_helper) }}"
+      is_holding: "{{ current_state in ['holding_up', 'holding_down'] }}"
+      is_release_event: "{{ event_action in ['button_release', 'button_release_after_hold'] }}"
+      
   - choose:
-      # Handle short press toggle (button_release without prior hold)
-      - conditions:
-          - condition: template
-            value_template: >
-              {{ trigger.event.data.action == 'button_release' and 
-                 (states(button_state_helper) == 'pressed' or
-                  (states(button_state_helper) != 'holding_up' and 
-                   states(button_state_helper) != 'holding_down')) }}
-        sequence:
-          - service: light.toggle
-            target:
-              entity_id: !input target_light
-          # Reset helper after toggle
-          - service: input_text.set_value
-            target:
-              entity_id: !input button_state_helper
-            data:
-              value: "idle"
-      
-      # Handle button_release when stuck in holding state (for units that only send release events)
-      - conditions:
-          - condition: template
-            value_template: >
-              {{ trigger.event.data.action == 'button_release' and 
-                 states(button_state_helper) in ['holding_up', 'holding_down'] }}
-        sequence:
-          # Stop the dimming by resetting state
-          - service: input_text.set_value
-            target:
-              entity_id: !input button_state_helper
-            data:
-              value: "idle"
-      
       # Handle button press - just track state
       - conditions:
           - condition: template
-            value_template: "{{ trigger.event.data.action == 'button_press' }}"
+            value_template: "{{ event_action == 'button_press' }}"
         sequence:
           - service: input_text.set_value
             target:
@@ -153,16 +126,27 @@ action:
             data:
               value: "pressed"
       
-      # Handle button release after hold - just update the helper
+      # Handle button release - either short press or end of hold
       - conditions:
           - condition: template
-            value_template: "{{ trigger.event.data.action == 'button_release_after_hold' }}"
+            value_template: "{{ is_release_event }}"
         sequence:
+          - choose:
+              # If not in holding state, it's a short press
+              - conditions:
+                  - condition: template
+                    value_template: "{{ not is_holding }}"
+                sequence:
+                  - service: light.toggle
+                    target:
+                      entity_id: !input target_light
+              # If in holding state, just stop the hold
+          # Always reset helper state on any release
           - service: input_text.set_value
             target:
               entity_id: !input button_state_helper
             data:
-              value: "released"
+              value: "idle"
       
       # Handle button hold - update helper and start dimming loop
       - conditions:
@@ -203,7 +187,8 @@ action:
                     {% set brightness = state_attr(target_light, 'brightness') | int(0) %}
                     {% set at_min = brightness <= 3 %}
                     {% set at_max = brightness >= 252 %}
-                    {{ helper_state in ['holding_up', 'holding_down'] and not (at_min or at_max) }}
+                    {% set should_continue = helper_state in ['holding_up', 'holding_down'] and not (at_min or at_max) %}
+                    {{ should_continue }}
               sequence:
                 - variables:
                     light_entity: !input target_light

@@ -72,52 +72,19 @@ condition:
       {{ message_match and event_action in ['button_press', 'button_release', 'button_hold', 'button_release_after_hold'] }}
 
 action:
-  - choose:
-      # Handle short press (button_release without prior hold)
-      - conditions:
-          - condition: template
-            value_template: >
-              {{ trigger.event.data.action == 'button_release' and 
-                 (states(button_state_helper) == 'pressed' or
-                  (states(button_state_helper) != 'holding_open' and 
-                   states(button_state_helper) != 'holding_close')) }}
-        sequence:
-          - choose:
-              # If cover is moving, stop it
-              - conditions:
-                  - condition: template
-                    value_template: >
-                      {{ states(target_cover) in ['opening', 'closing'] }}
-                sequence:
-                  - service: cover.stop_cover
-                    target:
-                      entity_id: !input target_cover
-              # If position > threshold, close
-              - conditions:
-                  - condition: numeric_state
-                    entity_id: !input target_cover
-                    attribute: current_position
-                    above: !input position_threshold
-                sequence:
-                  - service: cover.close_cover
-                    target:
-                      entity_id: !input target_cover
-            # Otherwise open
-            default:
-              - service: cover.open_cover
-                target:
-                  entity_id: !input target_cover
-          # Reset helper after action
-          - service: input_text.set_value
-            target:
-              entity_id: !input button_state_helper
-            data:
-              value: "idle"
+  - variables:
+      event_action: "{{ trigger.event.data.action }}"
+      current_state: "{{ states(button_state_helper) }}"
+      is_holding: "{{ current_state in ['holding_open', 'holding_close'] }}"
+      is_release_event: "{{ event_action in ['button_release', 'button_release_after_hold'] }}"
+      cover_is_moving: "{{ states(target_cover) in ['opening', 'closing'] }}"
+      current_position: "{{ state_attr(target_cover, 'current_position') | int(50) }}"
       
+  - choose:
       # Handle button press - just track state
       - conditions:
           - condition: template
-            value_template: "{{ trigger.event.data.action == 'button_press' }}"
+            value_template: "{{ event_action == 'button_press' }}"
         sequence:
           - service: input_text.set_value
             target:
@@ -125,32 +92,48 @@ action:
             data:
               value: "pressed"
       
-      # Handle button release after hold - stop the cover
+      # Handle button release - either short press or end of hold
       - conditions:
           - condition: template
-            value_template: "{{ trigger.event.data.action == 'button_release_after_hold' }}"
+            value_template: "{{ is_release_event }}"
         sequence:
-          - service: cover.stop_cover
-            target:
-              entity_id: !input target_cover
-          - service: input_text.set_value
-            target:
-              entity_id: !input button_state_helper
-            data:
-              value: "released"
-      
-      # Handle button_release when stuck in holding state (for units that only send release events)
-      - conditions:
-          - condition: template
-            value_template: >
-              {{ trigger.event.data.action == 'button_release' and 
-                 states(button_state_helper) in ['holding_open', 'holding_close'] }}
-        sequence:
-          # Stop the cover movement
-          - service: cover.stop_cover
-            target:
-              entity_id: !input target_cover
-          # Reset state
+          - choose:
+              # If in holding state, stop the cover
+              - conditions:
+                  - condition: template
+                    value_template: "{{ is_holding }}"
+                sequence:
+                  - service: cover.stop_cover
+                    target:
+                      entity_id: !input target_cover
+              # If not holding, it's a short press
+              - conditions:
+                  - condition: template
+                    value_template: "{{ not is_holding }}"
+                sequence:
+                  - choose:
+                      # If cover is moving, stop it
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ cover_is_moving }}"
+                        sequence:
+                          - service: cover.stop_cover
+                            target:
+                              entity_id: !input target_cover
+                      # If position > threshold, close
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ current_position > position_threshold }}"
+                        sequence:
+                          - service: cover.close_cover
+                            target:
+                              entity_id: !input target_cover
+                    # Otherwise open
+                    default:
+                      - service: cover.open_cover
+                        target:
+                          entity_id: !input target_cover
+          # Always reset helper on any release
           - service: input_text.set_value
             target:
               entity_id: !input button_state_helper
@@ -200,17 +183,20 @@ action:
               while:
                 - condition: template
                   value_template: >
-                    {{ states(button_state_helper) in ['holding_open', 'holding_close'] }}
+                    {% set helper_state = states(button_state_helper) %}
+                    {% set is_still_holding = helper_state in ['holding_open', 'holding_close'] %}
+                    {{ is_still_holding }}
               sequence:
+                - variables:
+                    position: "{{ state_attr(target_cover, 'current_position') | int(50) }}"
+                    is_open: "{{ states(target_cover) == 'open' }}"
+                    is_closed: "{{ states(target_cover) == 'closed' }}"
+                    at_limit: "{{ (position >= 98 or is_open) or (position <= 2 or is_closed) }}"
                 - choose:
                     # Check if fully open or closed
                     - conditions:
                         - condition: template
-                          value_template: >
-                            {% set position = state_attr(target_cover, 'current_position') | int(50) %}
-                            {% set is_open = states(target_cover) == 'open' %}
-                            {% set is_closed = states(target_cover) == 'closed' %}
-                            {{ (position >= 98 or is_open) or (position <= 2 or is_closed) }}
+                          value_template: "{{ at_limit }}"
                       sequence:
                         - service: input_text.set_value
                           target:

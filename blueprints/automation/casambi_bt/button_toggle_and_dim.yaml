@@ -186,8 +186,11 @@ action:
                       state: "holding"
                     - condition: template
                       value_template: >
-                        {% set brightness = state_attr(target_light, 'brightness') | int(0) %}
-                        {{ brightness > 3 and brightness < 252 }}
+                        {% set light = target_light %}
+                        {% set brightness = state_attr(light, 'brightness') | int(0) %}
+                        {% set light_on = states(light) == 'on' %}
+                        {# Stop only if we're truly at a limit we can't move past #}
+                        {{ light_on }}
               sequence:
                 - variables:
                     light_entity: !input target_light
@@ -214,14 +217,37 @@ action:
                         {{ step_pct }}
                       {% endif %}
                     calculated_step: "{{ adjusted_step * loop_direction_multiplier }}"
+                    # Check if we've hit a limit for our direction
+                    at_limit: >
+                      {% if loop_direction_multiplier == 1 and current_brightness >= 254 %}
+                        true
+                      {% elif loop_direction_multiplier == -1 and current_brightness <= 1 %}
+                        true
+                      {% else %}
+                        false
+                      {% endif %}
                 
-                - service: light.turn_on
-                  target:
-                    entity_id: !input target_light
-                  data:
-                    brightness_step_pct: "{{ calculated_step }}"
-                    transition: >
-                      {{ (dimming_interval | default(200)) / 1000 }}
+                # Only adjust brightness if not at limit
+                - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ not at_limit }}"
+                      sequence:
+                        - service: light.turn_on
+                          target:
+                            entity_id: !input target_light
+                          data:
+                            brightness_step_pct: "{{ calculated_step }}"
+                            transition: >
+                              {{ (dimming_interval | default(200)) / 1000 }}
+                    default:
+                      # If at limit, stop the loop by clearing helper
+                      - service: input_text.set_value
+                        target:
+                          entity_id: !input button_state_helper
+                        data:
+                          value: "idle"
+                
                 - delay:
                     milliseconds: !input dimming_interval
           

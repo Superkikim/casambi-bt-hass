@@ -160,22 +160,6 @@ action:
             data:
               value: "holding"
           
-          # Determine initial direction (but don't store it in helper)
-          - variables:
-              light_entity: !input target_light
-              direction_setting: !input dimming_direction
-              current_brightness: "{{ state_attr(light_entity, 'brightness') | int(0) }}"
-              direction_multiplier: >
-                {% if direction_setting == 'down' %}
-                  -1
-                {% elif direction_setting == 'up' %}
-                  1
-                {% elif states(light_entity) == 'off' or current_brightness <= 127 %}
-                  1
-                {% else %}
-                  -1
-                {% endif %}
-          
           # Start dimming loop
           - repeat:
               while:
@@ -194,28 +178,31 @@ action:
                     dimming_step_value: !input dimming_step
                     step_pct: "{{ (dimming_step_value | default(25) / 255 * 100) | round(1) }}"
                     current_brightness: "{{ state_attr(light_entity, 'brightness') | int(255) }}"
-                    # Re-calculate direction multiplier inside loop
                     direction_setting: !input dimming_direction
-                    loop_direction_multiplier: >
+                    # Determine direction once based on settings
+                    # For toggle mode, use initial brightness to decide direction
+                    # We check if repeat.first to get initial brightness, otherwise use a safe default
+                    initial_check_brightness: "{{ current_brightness if repeat.first else 255 }}"
+                    fixed_direction: >
                       {% if direction_setting == 'down' %}
                         -1
                       {% elif direction_setting == 'up' %}
                         1
-                      {% elif current_brightness > 127 %}
-                        -1
-                      {% else %}
+                      {% elif initial_check_brightness <= 127 %}
                         1
+                      {% else %}
+                        -1
                       {% endif %}
                     # When dimming down and near minimum, use smaller steps
                     adjusted_step: >
-                      {% if loop_direction_multiplier == -1 and current_brightness <= 16 %}
+                      {% if fixed_direction == -1 and current_brightness <= 16 %}
                         {{ ((current_brightness - 1) / 255 * 100) | abs }}
                       {% else %}
                         {{ step_pct }}
                       {% endif %}
-                    calculated_step: "{{ adjusted_step * loop_direction_multiplier }}"
+                    calculated_step: "{{ adjusted_step * fixed_direction }}"
                     # Check if we've hit a limit for our direction
-                    at_limit: "{{ (loop_direction_multiplier == 1 and current_brightness >= 255) or (loop_direction_multiplier == -1 and current_brightness <= 1) }}"
+                    at_limit: "{{ (fixed_direction == 1 and current_brightness >= 255) or (fixed_direction == -1 and current_brightness <= 1) }}"
                 - choose:
                     - conditions:
                         - condition: template

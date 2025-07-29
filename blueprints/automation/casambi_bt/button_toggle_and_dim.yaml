@@ -223,8 +223,6 @@ action:
                       {% else %}
                         false
                       {% endif %}
-                
-                # Only adjust brightness if not at limit
                 - choose:
                     - conditions:
                         - condition: template

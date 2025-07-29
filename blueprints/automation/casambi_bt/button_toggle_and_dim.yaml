@@ -187,10 +187,7 @@ action:
                     - condition: template
                       value_template: >
                         {% set light = target_light %}
-                        {% set brightness = state_attr(light, 'brightness') | int(0) %}
-                        {% set light_on = states(light) == 'on' %}
-                        {# Stop only if we're truly at a limit we can't move past #}
-                        {{ light_on }}
+                        {{ states(light) == 'on' }}
               sequence:
                 - variables:
                     light_entity: !input target_light

@@ -47,10 +47,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Event deduplication cache: (unit_id, button, action) -> timestamp
     event_cache: dict[tuple[int, int, str], float] = {}
-    
+
     # Get deduplication window from config or use default
     dedup_window = entry.options.get("switch_event_dedup_window", 0.6)  # Default 600ms
-    
+
     _LOGGER.info("Switch event deduplication enabled with %.1fs window", dedup_window)
 
     # Register switch event handler that fires Home Assistant events
@@ -61,24 +61,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         decrypted_data = event_data.get("decrypted_data")
         payload_hex = event_data.get("payload_hex")
         extra_data = event_data.get("extra_data")
-        
+
         # Convert payload_hex to string if it's bytes
         payload_hex_str = payload_hex.hex() if isinstance(payload_hex, bytes) else payload_hex
-        
+
         # Check for duplicate events
         unit_id = event_data.get("unit_id")
         button = event_data.get("button")
         action = event_data.get("event")  # button_press, button_release, etc.
-        
+
         if unit_id is not None and button is not None and action:
             cache_key = (unit_id, button, action)
             current_time = time.time()
-            
+
             # Clean up old entries from cache
             for key in list(event_cache.keys()):
                 if current_time - event_cache[key] > dedup_window:
                     del event_cache[key]
-            
+
             # Check if this event was seen recently
             if cache_key in event_cache:
                 time_diff = current_time - event_cache[cache_key]
@@ -88,10 +88,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                         unit_id, button, action, time_diff
                     )
                     return
-            
+
             # Record this event
             event_cache[cache_key] = current_time
-        
+
         hass.bus.async_fire(
             f"{DOMAIN}_switch_event",
             {

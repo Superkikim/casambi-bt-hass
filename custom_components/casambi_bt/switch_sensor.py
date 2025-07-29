@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Final
 
 from CasambiBt import Unit
 
@@ -15,9 +15,45 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import CasambiApi
 from .const import DOMAIN
-from .event import _is_switch_unit
 
 _LOGGER = logging.getLogger(__name__)
+
+# Known switch model keywords to identify switch units
+SWITCH_MODELS: Final[set[str]] = {
+    "switch",
+    "xpress",
+    "button",
+    "pushbutton",
+    "batteryswitch",
+    "wall switch",
+    "remote",
+}
+
+
+def _is_switch_unit(unit: Unit) -> bool:
+    """Check if a unit is a switch based on its model or manufacturer."""
+    # Check model name
+    model_lower = unit.unitType.model.lower()
+    if any(keyword in model_lower for keyword in SWITCH_MODELS):
+        return True
+    
+    # Check manufacturer
+    manufacturer_lower = unit.unitType.manufacturer.lower()
+    if "switch" in manufacturer_lower:
+        return True
+    
+    # Check if unit has no light controls (dimmer, rgb, etc)
+    # but still has controls (indicating it might be a switch)
+    light_controls = {
+        "DIMMER", "RGB", "WHITE", "TEMPERATURE", "XY", "COLORSOURCE"
+    }
+    unit_controls = {c.type.name for c in unit.unitType.controls}
+    
+    # If it has controls but none are light controls, it might be a switch
+    if unit_controls and not unit_controls.intersection(light_controls):
+        return True
+    
+    return False
 
 
 async def async_setup_entry(

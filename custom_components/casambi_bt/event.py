@@ -167,6 +167,7 @@ class CasambiSwitchEvent(CasambiUnitEntity, EventEntity):
         if self._last_event_data:
             attrs.update({
                 "event_type": self._last_event_data.get("event"),
+                "action": self._last_event_data.get("event"),  # Match HA event format
                 "button": self._last_event_data.get("button"),
                 "unit_id": self._last_event_data.get("unit_id"),
                 "message_type": self._last_event_data.get("message_type"),

@@ -237,13 +237,13 @@ action:
                             brightness_step_pct: "{{ calculated_step }}"
                             transition: >
                               {{ (dimming_interval | default(200)) / 1000 }}
-                    default:
-                      # If at limit, stop the loop by clearing helper
-                      - service: input_text.set_value
-                        target:
-                          entity_id: !input button_state_helper
-                        data:
-                          value: "idle"
+                  default:
+                    # If at limit, stop the loop by clearing helper
+                    - service: input_text.set_value
+                      target:
+                        entity_id: !input button_state_helper
+                      data:
+                        value: "idle"
                 
                 - delay:
                     milliseconds: !input dimming_interval

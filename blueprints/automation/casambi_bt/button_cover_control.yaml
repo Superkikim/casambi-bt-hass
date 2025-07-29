@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Cover Control
-  description: Control blinds/covers - short press to open/close/stop, hold to open/close continuously - v1.1.3
+  description: Control blinds/covers - short press to open/close/stop, hold to open/close continuously - v1.2.0
   domain: automation
   input:
     unit_id:
@@ -106,17 +106,17 @@ action:
                   - service: cover.stop_cover
                     target:
                       entity_id: !input target_cover
-              # If position > threshold, close
+              # If position <= threshold, open (it's mostly closed)
               - conditions:
                   - condition: template
-                    value_template: "{{ current_position > position_threshold }}"
+                    value_template: "{{ current_position <= position_threshold }}"
                 sequence:
-                  - service: cover.close_cover
+                  - service: cover.open_cover
                     target:
                       entity_id: !input target_cover
-            # Otherwise open
+            # Otherwise close (position > threshold, it's mostly open)
             default:
-              - service: cover.open_cover
+              - service: cover.close_cover
                 target:
                   entity_id: !input target_cover
           - service: input_text.set_value
@@ -158,21 +158,23 @@ action:
           
           # Determine direction and start movement
           - choose:
-              # If position > threshold or cover is closing, open it
+              # If position > threshold, close it (it's mostly open)
+              # If cover is already closing, continue closing
+              # If cover is opening, reverse to close
               - conditions:
                   - condition: or
                     conditions:
                       - condition: template
                         value_template: "{{ fresh_position > position_threshold }}"
                       - condition: template
-                        value_template: "{{ states(target_cover) == 'closing' }}"
+                        value_template: "{{ states(target_cover) == 'opening' }}"
                 sequence:
-                  - service: cover.open_cover
+                  - service: cover.close_cover
                     target:
                       entity_id: !input target_cover
-            # Otherwise close it
+            # Otherwise open it (position <= threshold or already closing)
             default:
-              - service: cover.close_cover
+              - service: cover.open_cover
                 target:
                   entity_id: !input target_cover
           

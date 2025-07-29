@@ -116,6 +116,7 @@ class CasambiSwitchEvent(CasambiUnitEntity, EventEntity):
         
         # Store last event data
         self._last_event_data: dict[str, Any] = {}
+        self._last_event_timestamp: str = "unknown"
         
         # Register for switch events
         self._api.register_switch_event_callback(self._handle_switch_event)
@@ -137,8 +138,9 @@ class CasambiSwitchEvent(CasambiUnitEntity, EventEntity):
             f"event={event_data.get('event')}"
         )
         
-        # Store the event data
+        # Store the event data and timestamp
         self._last_event_data = event_data
+        self._last_event_timestamp = dt_util.now().isoformat()
         
         # Trigger the event with the event type
         event_type = event_data.get("event", "unknown")
@@ -148,12 +150,13 @@ class CasambiSwitchEvent(CasambiUnitEntity, EventEntity):
         self.async_write_ha_state()
     
     @property
-    def state(self) -> str | None:
+    def state(self) -> str:
         """Return the state (timestamp of last event)."""
         if self._last_event_data:
-            # Return ISO format timestamp
-            return dt_util.now().isoformat()
-        return None
+            # Return ISO format timestamp of last event
+            return self._last_event_timestamp
+        # Return "unknown" instead of None for event entities
+        return "unknown"
     
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -168,6 +171,7 @@ class CasambiSwitchEvent(CasambiUnitEntity, EventEntity):
                 "unit_id": self._last_event_data.get("unit_id"),
                 "message_type": self._last_event_data.get("message_type"),
                 "flags": self._last_event_data.get("flags"),
+                "last_event": self._last_event_timestamp,
             })
         
         # Add unit information

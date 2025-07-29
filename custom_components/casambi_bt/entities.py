@@ -164,6 +164,7 @@ class CasambiUnitEntity(CasambiEntity, metaclass=ABCMeta):
             name=unit.name,
             manufacturer=unit.unitType.manufacturer,
             model=unit.unitType.model,
+            model_id=f"Unit ID: {unit.deviceId}",  # Shows in device page
             sw_version=unit.firmwareVersion,
             identifiers={(DOMAIN, unit.uuid)},
             via_device=(DOMAIN, self._api.casa.networkId),

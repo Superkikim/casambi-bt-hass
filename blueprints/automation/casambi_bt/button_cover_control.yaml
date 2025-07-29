@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Cover Control
-  description: Control blinds/covers - short press to open/close/stop, hold to open/close continuously
+  description: Control blinds/covers - short press to open/close/stop, hold to open/close continuously - v1.1.0
   domain: automation
   input:
     unit_id:

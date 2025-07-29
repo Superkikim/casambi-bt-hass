@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Toggle and Dim
-  description: Short press to toggle light, hold to dim (combines toggle and dimming functionality)
+  description: Short press to toggle light, hold to dim (combines toggle and dimming functionality) - v1.2.0
   domain: automation
   input:
     unit_id:

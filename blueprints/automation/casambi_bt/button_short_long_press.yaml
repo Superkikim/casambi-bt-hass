@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Actions
-  description: Versatile button automation with customizable actions for different button events
+  description: Versatile button automation with customizable actions for different button events - v1.1.0
   domain: automation
   input:
     unit_id:

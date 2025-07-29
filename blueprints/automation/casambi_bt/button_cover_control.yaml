@@ -75,7 +75,7 @@ action:
   - variables:
       event_action: "{{ trigger.event.data.action }}"
       current_state: "{{ states(button_state_helper) }}"
-      is_holding: "{{ current_state in ['holding_open', 'holding_close'] }}"
+      is_holding: "{{ current_state == 'holding' }}"
       is_release_event: "{{ event_action in ['button_release', 'button_release_after_hold'] }}"
       cover_is_moving: "{{ states(target_cover) in ['opening', 'closing'] }}"
       current_position: "{{ state_attr(target_cover, 'current_position') | int(50) }}"
@@ -145,35 +145,29 @@ action:
           - condition: template
             value_template: "{{ trigger.event.data.action == 'button_hold' }}"
         sequence:
-          # Determine direction based on current position
+          # Set state to holding
+          - service: input_text.set_value
+            target:
+              entity_id: !input button_state_helper
+            data:
+              value: "holding"
+          
+          # Determine direction and start movement
           - choose:
               # If position > threshold or cover is closing, open it
               - conditions:
                   - condition: or
                     conditions:
-                      - condition: numeric_state
-                        entity_id: !input target_cover
-                        attribute: current_position
-                        above: !input position_threshold
-                      - condition: state
-                        entity_id: !input target_cover
-                        state: "closing"
+                      - condition: template
+                        value_template: "{{ current_position > position_threshold }}"
+                      - condition: template
+                        value_template: "{{ states(target_cover) == 'closing' }}"
                 sequence:
-                  - service: input_text.set_value
-                    target:
-                      entity_id: !input button_state_helper
-                    data:
-                      value: "holding_open"
                   - service: cover.open_cover
                     target:
                       entity_id: !input target_cover
             # Otherwise close it
             default:
-              - service: input_text.set_value
-                target:
-                  entity_id: !input button_state_helper
-                data:
-                  value: "holding_close"
               - service: cover.close_cover
                 target:
                   entity_id: !input target_cover
@@ -184,7 +178,7 @@ action:
                 - condition: template
                   value_template: >
                     {% set helper_state = states(button_state_helper) %}
-                    {% set is_still_holding = helper_state in ['holding_open', 'holding_close'] %}
+                    {% set is_still_holding = helper_state == 'holding' %}
                     {{ is_still_holding }}
               sequence:
                 - variables:

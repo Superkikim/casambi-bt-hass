@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Cover Control
-  description: Control blinds/covers - short press to open/close/stop, hold to open/close continuously - v1.1.1
+  description: Control blinds/covers - short press to open/close/stop, hold to open/close continuously - v1.1.2
   domain: automation
   input:
     unit_id:
@@ -92,60 +92,52 @@ action:
             data:
               value: "pressed"
       
-      # Handle button release - either short press or end of hold
+      # Handle normal button release (short press)
       - conditions:
           - condition: template
-            value_template: "{{ is_release_event }}"
+            value_template: "{{ event_action == 'button_release' and not is_holding }}"
         sequence:
-          # Ignore button_release_after_hold if we're not in a holding state
           - choose:
+              # If cover is moving, stop it
               - conditions:
                   - condition: template
-                    value_template: "{{ event_action == 'button_release_after_hold' and current_state == 'idle' }}"
-                sequence: []  # Do nothing for orphaned release_after_hold events
+                    value_template: "{{ cover_is_moving }}"
+                sequence:
+                  - service: cover.stop_cover
+                    target:
+                      entity_id: !input target_cover
+              # If position > threshold, close
+              - conditions:
+                  - condition: template
+                    value_template: "{{ current_position > position_threshold }}"
+                sequence:
+                  - service: cover.close_cover
+                    target:
+                      entity_id: !input target_cover
+            # Otherwise open
             default:
-              - choose:
-                  # If in holding state, stop the cover
-                  - conditions:
-                      - condition: template
-                        value_template: "{{ is_holding }}"
-                    sequence:
-                      - service: cover.stop_cover
-                        target:
-                          entity_id: !input target_cover
-                  # If not holding, it's a short press
-                  - conditions:
-                      - condition: template
-                        value_template: "{{ not is_holding }}"
-                    sequence:
-                      - choose:
-                          # If cover is moving, stop it
-                          - conditions:
-                              - condition: template
-                                value_template: "{{ cover_is_moving }}"
-                            sequence:
-                              - service: cover.stop_cover
-                                target:
-                                  entity_id: !input target_cover
-                          # If position > threshold, close
-                          - conditions:
-                              - condition: template
-                                value_template: "{{ current_position > position_threshold }}"
-                            sequence:
-                              - service: cover.close_cover
-                                target:
-                                  entity_id: !input target_cover
-                        # Otherwise open
-                        default:
-                          - service: cover.open_cover
-                            target:
-                              entity_id: !input target_cover
-              # Always reset helper on any release
-              - service: input_text.set_value
+              - service: cover.open_cover
                 target:
-                  entity_id: !input button_state_helper
-                data:
-                  value: "idle"
+                  entity_id: !input target_cover
+          - service: input_text.set_value
+            target:
+              entity_id: !input button_state_helper
+            data:
+              value: "idle"
+      
+      # Handle button release while holding - stop the cover
+      - conditions:
+          - condition: template
+            value_template: "{{ (event_action == 'button_release' or event_action == 'button_release_after_hold') and is_holding }}"
+        sequence:
+          - service: cover.stop_cover
+            target:
+              entity_id: !input target_cover
+          - service: input_text.set_value
+            target:
+              entity_id: !input button_state_helper
+            data:
+              value: "idle"
       
       # Handle button hold - start opening or closing
       - conditions:

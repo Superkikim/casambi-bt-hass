@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Toggle and Dim
-  description: Short press to toggle light, hold to dim (combines toggle and dimming functionality) - v1.2.1
+  description: Short press to toggle light, hold to dim (combines toggle and dimming functionality) - v1.2.2
   domain: automation
   input:
     unit_id:
@@ -126,34 +126,43 @@ action:
             data:
               value: "pressed"
       
-      # Handle button release - either short press or end of hold
+      # Handle normal button release (short press)
       - conditions:
           - condition: template
-            value_template: "{{ is_release_event }}"
+            value_template: "{{ event_action == 'button_release' and not is_holding }}"
         sequence:
-          # Ignore button_release_after_hold if we're not in a holding state
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ event_action == 'button_release_after_hold' and current_state == 'idle' }}"
-                sequence: []  # Do nothing for orphaned release_after_hold events
-            default:
-              - choose:
-                  # If not in holding state, it's a short press
-                  - conditions:
-                      - condition: template
-                        value_template: "{{ not is_holding }}"
-                    sequence:
-                      - service: light.toggle
-                        target:
-                          entity_id: !input target_light
-                  # If in holding state, just stop the hold
-              # Always reset helper state on any release
-              - service: input_text.set_value
-                target:
-                  entity_id: !input button_state_helper
-                data:
-                  value: "idle"
+          - service: light.toggle
+            target:
+              entity_id: !input target_light
+          - service: input_text.set_value
+            target:
+              entity_id: !input button_state_helper
+            data:
+              value: "idle"
+      
+      # Handle button release after hold
+      - conditions:
+          - condition: template
+            value_template: "{{ event_action == 'button_release_after_hold' and is_holding }}"
+        sequence:
+          # Just reset the state, dimming already stopped when helper changed
+          - service: input_text.set_value
+            target:
+              entity_id: !input button_state_helper
+            data:
+              value: "idle"
+      
+      # Handle any other release scenarios (including normal release while holding)
+      - conditions:
+          - condition: template
+            value_template: "{{ event_action == 'button_release' and is_holding }}"
+        sequence:
+          # Reset state to stop dimming
+          - service: input_text.set_value
+            target:
+              entity_id: !input button_state_helper
+            data:
+              value: "idle"
       
       # Handle button hold - update helper and start dimming loop
       - conditions:

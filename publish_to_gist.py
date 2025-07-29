@@ -44,6 +44,11 @@ def create_or_update_gist(files_content, description="Casambi Bluetooth Home Ass
     if gist_id_file.exists():
         gist_id = gist_id_file.read_text().strip()
     
+    # In GitHub Actions, we might have the GIST_ID as an environment variable
+    if not gist_id and os.environ.get('GIST_ID'):
+        gist_id = os.environ.get('GIST_ID')
+        gist_id_file.write_text(gist_id)
+    
     # Prepare the gist data
     gist_data = {
         "description": description,

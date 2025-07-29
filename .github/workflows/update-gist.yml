@@ -1,0 +1,45 @@
+name: Update Blueprint Gist
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'blueprints/automation/casambi_bt/*.yaml'
+  workflow_dispatch:
+
+jobs:
+  update-gist:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Update Gist
+      env:
+        GITHUB_TOKEN: ${{ secrets.GIST_TOKEN }}
+        GIST_ID: ${{ vars.GIST_ID || secrets.GIST_ID }}
+      run: |
+        # Install GitHub CLI
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+        sudo apt update
+        sudo apt install gh -y
+        
+        # Configure gh with the token
+        echo "$GITHUB_TOKEN" | gh auth login --with-token
+        
+        # Run the update script
+        python3 publish_to_gist.py
+        
+    - name: Commit gist ID if created
+      run: |
+        if [ -f .gist_id ]; then
+          if ! git diff --quiet .gist_id; then
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            git add .gist_id
+            git commit -m "Update gist ID [skip ci]"
+            git push
+          fi
+        fi

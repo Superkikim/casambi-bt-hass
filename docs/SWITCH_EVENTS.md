@@ -7,7 +7,7 @@ Switch button press/release events are fired as Home Assistant events that can b
 - **Event Data**:
   - `entry_id`: The config entry ID
   - `unit_id`: The Casambi unit ID that sent the event
-  - `button`: Button number (0-based)
+  - `button`: Button number (1-4, matching Casambi app)
   - `action`: Event type - one of:
     - `"button_press"` - Initial button press
     - `"button_hold"` - Sent continuously while button is held down
@@ -56,7 +56,7 @@ If you see multiple events with different `unit_id` values, verify the correct o
 5. Note the **Unit ID** shown
 6. Use this Unit ID in your automations
 
-**Button Number Mapping**: The button number in Home Assistant events (0-based) may not directly match the Casambi app numbering. Always test each physical button and note its corresponding `button` value in the events.
+**Button Numbers**: Button numbers in events match the Casambi app (1-4). Always test each physical button first to verify which button number it generates in the events.
 
 ### Event Deduplication
 The integration includes built-in event deduplication to prevent duplicate triggers. You can configure the deduplication window in the integration options (default: 600ms). This eliminates the need for complex debouncing logic in your automations.
@@ -76,7 +76,7 @@ event_type: casambi_bt_switch_event
 data:
   entry_id: fc8461de92e186495147fdb327fddea9
   unit_id: 31
-  button: 0
+  button: 1
   action: button_release
   message_type: 8
   flags: 3
@@ -89,7 +89,7 @@ event_type: casambi_bt_switch_event
 data:
   entry_id: fc8461de92e186495147fdb327fddea9
   unit_id: 31
-  button: 0
+  button: 1
   action: button_hold
   message_type: 16
   flags: 2
@@ -102,7 +102,7 @@ event_type: casambi_bt_switch_event
 data:
   entry_id: fc8461de92e186495147fdb327fddea9
   unit_id: 31
-  button: 0
+  button: 1
   action: button_release_after_hold
   message_type: 16
   flags: 2

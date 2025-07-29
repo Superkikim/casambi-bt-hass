@@ -344,12 +344,10 @@ class CasambiApi:
         """Handle switch events from the Casambi network."""
         _LOGGER.debug("Switch event received: %s", event_data)
         for cb in self._switch_event_callbacks:
-            if asyncio.iscoroutinefunction(cb):
-                self.conf_entry.async_create_task(
-                    self.hass, cb(event_data), "switch_event_callback"
-                )
-            else:
+            try:
                 cb(event_data)
+            except Exception:
+                _LOGGER.exception("Error in switch event callback")
 
     def register_switch_event_callback(self, callback: Callable[[dict], None]) -> None:
         """Register a callback for switch events."""

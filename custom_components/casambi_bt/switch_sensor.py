@@ -7,7 +7,7 @@ from typing import Any
 
 from CasambiBt import Unit
 
-from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
@@ -15,7 +15,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import CasambiApi
 from .const import DOMAIN
-from .entities import CasambiEntity
 from .event import _is_switch_unit
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,23 +39,19 @@ async def async_setup_entry(
     async_add_entities(sensor_entities)
 
 
-class CasambiSwitchSensor(CasambiEntity, SensorEntity):
+class CasambiSwitchSensor(SensorEntity):
     """Sensor entity showing last event for a Casambi switch unit."""
     
     def __init__(self, api: CasambiApi, unit: Unit) -> None:
         """Initialize the switch sensor entity."""
-        # Create a typed description for the base class
-        from .entities import TypedEntityDescription
-        description = TypedEntityDescription(
-            key=f"{unit.uuid}_last_event",
-            name=f"{unit.name} Last Event",
-            entity_type="sensor",
-        )
+        # Store references
+        self._api = api
+        self._unit = unit
         
-        # Initialize base class
-        super().__init__(api, description, unit)
-        
-        # Set sensor-specific properties
+        # Set entity attributes
+        self._attr_has_entity_name = True
+        self._attr_name = "Last Event"
+        self._attr_unique_id = f"{api.casa.networkId}-unit-{unit.uuid}-last-event"
         self._attr_icon = "mdi:button-pointer"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         
@@ -75,7 +70,7 @@ class CasambiSwitchSensor(CasambiEntity, SensorEntity):
     def _handle_switch_event(self, event_data: dict[str, Any]) -> None:
         """Handle incoming switch events."""
         # Check if this event is for our unit
-        if event_data.get("unit_id") != self._obj.deviceId:
+        if event_data.get("unit_id") != self._unit.deviceId:
             return
         
         _LOGGER.debug(
@@ -90,21 +85,16 @@ class CasambiSwitchSensor(CasambiEntity, SensorEntity):
         self.async_write_ha_state()
     
     @property
-    def unique_id(self) -> str:
-        """Return unique ID for entity."""
-        return f"{self._api.casa.networkId}-unit-{self._obj.uuid}-last-event"
-    
-    @property
     def device_info(self):
         """Return device info."""
         from homeassistant.helpers.device_registry import DeviceInfo
         return DeviceInfo(
-            identifiers={(DOMAIN, self._obj.uuid)},
-            name=self._obj.name,
-            manufacturer=self._obj.unitType.manufacturer,
-            model=self._obj.unitType.model,
-            model_id=f"Unit ID: {self._obj.deviceId}",
-            sw_version=self._obj.firmwareVersion,
+            identifiers={(DOMAIN, self._unit.uuid)},
+            name=self._unit.name,
+            manufacturer=self._unit.unitType.manufacturer,
+            model=self._unit.unitType.model,
+            model_id=f"Unit ID: {self._unit.deviceId}",
+            sw_version=self._unit.firmwareVersion,
             via_device=(DOMAIN, self._api.casa.networkId),
         )
     
@@ -131,7 +121,7 @@ class CasambiSwitchSensor(CasambiEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
-        attrs = super().extra_state_attributes or {}
+        attrs = {}
         
         # Add all event data if available
         if self._last_event_data:
@@ -146,8 +136,8 @@ class CasambiSwitchSensor(CasambiEntity, SensorEntity):
         
         # Add unit information
         attrs.update({
-            "device_id": self._obj.deviceId,
-            "online": self._obj.online,
+            "device_id": self._unit.deviceId,
+            "online": self._unit.online,
         })
         
         return attrs

@@ -29,10 +29,6 @@ You can monitor these events in Developer Tools → Events → Listen to events 
 
 ## Important Notes
 
-### Message Types and Event Data
-- **Message Type 8**: Button press/release events
-- **Message Type 16**: Button hold events
-
 **Tip**: You can use the Casambi app to configure switch button actions while simultaneously listening to events in Home Assistant. This allows you to:
 - Use Casambi's built-in button assignments for some actions
 - Create custom Home Assistant automations for other buttons

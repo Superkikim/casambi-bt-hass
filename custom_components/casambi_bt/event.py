@@ -129,7 +129,7 @@ class CasambiSwitchEvent(CasambiUnitEntity, EventEntity):
     def _handle_switch_event(self, event_data: dict[str, Any]) -> None:
         """Handle incoming switch events."""
         # Check if this event is for our unit
-        if event_data.get("unit_id") != self._unit.deviceId:
+        if event_data.get("unit_id") != self._obj.deviceId:
             return
         
         _LOGGER.debug(
@@ -172,12 +172,12 @@ class CasambiSwitchEvent(CasambiUnitEntity, EventEntity):
         
         # Add unit information
         attrs.update({
-            "device_id": self._unit.deviceId,
-            "address": self._unit.address,
-            "firmware_version": self._unit.firmwareVersion,
-            "model": self._unit.unitType.model,
-            "manufacturer": self._unit.unitType.manufacturer,
-            "online": self._unit.online,
+            "device_id": self._obj.deviceId,
+            "address": self._obj.address,
+            "firmware_version": self._obj.firmwareVersion,
+            "model": self._obj.unitType.model,
+            "manufacturer": self._obj.unitType.manufacturer,
+            "online": self._obj.online,
         })
         
         return attrs

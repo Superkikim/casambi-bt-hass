@@ -70,7 +70,12 @@ async def async_setup_entry(
     _LOGGER.info(f"Creating {len(switch_units)} switch sensor entities")
     
     # Create sensor entities for each switch unit
-    sensor_entities = [CasambiSwitchSensor(casa_api, unit) for unit in switch_units]
+    sensor_entities = []
+    for unit in switch_units:
+        # Add last event sensor
+        sensor_entities.append(CasambiSwitchSensor(casa_api, unit))
+        # Add unit ID diagnostic sensor
+        sensor_entities.append(CasambiSwitchUnitIdSensor(casa_api, unit))
     
     async_add_entities(sensor_entities)
 
@@ -86,7 +91,7 @@ class CasambiSwitchSensor(SensorEntity):
         
         # Set entity attributes
         self._attr_has_entity_name = True
-        self._attr_name = f"Last Event (Unit {unit.deviceId})"
+        self._attr_name = "Last Event"
         self._attr_unique_id = f"{api.casa.networkId}-unit-{unit.uuid}-last-event"
         self._attr_icon = "mdi:button-pointer"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -177,3 +182,35 @@ class CasambiSwitchSensor(SensorEntity):
         })
         
         return attrs
+
+
+class CasambiSwitchUnitIdSensor(SensorEntity):
+    """Diagnostic sensor showing the unit ID for a Casambi switch."""
+    
+    def __init__(self, api: CasambiApi, unit: Unit) -> None:
+        """Initialize the unit ID sensor."""
+        # Store references
+        self._api = api
+        self._unit = unit
+        
+        # Set entity attributes
+        self._attr_has_entity_name = True
+        self._attr_name = "Unit ID"
+        self._attr_unique_id = f"{api.casa.networkId}-unit-{unit.uuid}-unit-id"
+        self._attr_icon = "mdi:identifier"
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_native_value = str(unit.deviceId)
+    
+    @property
+    def device_info(self):
+        """Return device info."""
+        from homeassistant.helpers.device_registry import DeviceInfo
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._unit.uuid)},
+            name=self._unit.name,
+            manufacturer=self._unit.unitType.manufacturer,
+            model=self._unit.unitType.model,
+            model_id=f"Unit ID: {self._unit.deviceId}",
+            sw_version=self._unit.firmwareVersion,
+            via_device=(DOMAIN, self._api.casa.networkId),
+        )

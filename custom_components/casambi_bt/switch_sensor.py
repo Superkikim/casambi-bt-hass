@@ -86,7 +86,7 @@ class CasambiSwitchSensor(SensorEntity):
         
         # Set entity attributes
         self._attr_has_entity_name = True
-        self._attr_name = "Last Event"
+        self._attr_name = f"Last Event (Unit {unit.deviceId})"
         self._attr_unique_id = f"{api.casa.networkId}-unit-{unit.uuid}-last-event"
         self._attr_icon = "mdi:button-pointer"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC

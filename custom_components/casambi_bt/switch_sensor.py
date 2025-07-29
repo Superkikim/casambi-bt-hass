@@ -68,6 +68,10 @@ async def async_setup_entry(
     switch_units = [unit for unit in casa_api.casa.units if _is_switch_unit(unit)]
     
     _LOGGER.info(f"Creating {len(switch_units)} switch sensor entities")
+    for unit in switch_units:
+        _LOGGER.debug(
+            f"Switch unit found: {unit.name} (ID: {unit.deviceId}, Model: {unit.unitType.model})"
+        )
     
     # Create sensor entities for each switch unit
     sensor_entities = []
@@ -103,6 +107,9 @@ class CasambiSwitchSensor(SensorEntity):
         
         # Register for switch events
         self._api.register_switch_event_callback(self._handle_switch_event)
+        _LOGGER.info(
+            f"Switch sensor registered for unit {unit.name} (ID: {unit.deviceId})"
+        )
     
     async def async_will_remove_from_hass(self) -> None:
         """Unregister handlers when entity is removed."""
@@ -113,7 +120,11 @@ class CasambiSwitchSensor(SensorEntity):
     def _handle_switch_event(self, event_data: dict[str, Any]) -> None:
         """Handle incoming switch events."""
         # Check if this event is for our unit
-        if event_data.get("unit_id") != self._unit.deviceId:
+        event_unit_id = event_data.get("unit_id")
+        if event_unit_id != self._unit.deviceId:
+            _LOGGER.debug(
+                f"Switch sensor {self._unit.name} (ID: {self._unit.deviceId}) ignoring event for unit {event_unit_id}"
+            )
             return
         
         _LOGGER.debug(

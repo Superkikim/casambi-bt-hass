@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Cover Control
-  description: Control blinds/covers - short press to open/close/stop, hold to open/close continuously - v1.1.2
+  description: Control blinds/covers - short press to open/close/stop, hold to open/close continuously - v1.1.3
   domain: automation
   input:
     unit_id:
@@ -151,6 +151,11 @@ action:
             data:
               value: "holding"
           
+          # Get fresh position and determine direction
+          - variables:
+              fresh_position: "{{ state_attr(target_cover, 'current_position') | int(50) }}"
+              cover_moving: "{{ states(target_cover) in ['opening', 'closing'] }}"
+          
           # Determine direction and start movement
           - choose:
               # If position > threshold or cover is closing, open it
@@ -158,7 +163,7 @@ action:
                   - condition: or
                     conditions:
                       - condition: template
-                        value_template: "{{ current_position > position_threshold }}"
+                        value_template: "{{ fresh_position > position_threshold }}"
                       - condition: template
                         value_template: "{{ states(target_cover) == 'closing' }}"
                 sequence:

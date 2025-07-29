@@ -13,16 +13,15 @@ from typing import Any, Final
 
 from CasambiBt import Unit
 
-from homeassistant.components.event import EventEntity, EventEntityDescription
+from homeassistant.components.event import EventEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import CasambiApi
 from .const import DOMAIN
-from .entities import CasambiUnitEntity
+from .entities import CasambiUnitEntity, TypedEntityDescription
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -96,14 +95,16 @@ class CasambiSwitchEvent(CasambiUnitEntity, EventEntity):
         if "switch" not in unit_name.lower():
             unit_name = f"{unit_name} Switch"
         
-        description = EventEntityDescription(
-            key=entity_key,
+        description = TypedEntityDescription(
+            key=unit.uuid,  # Use uuid as key for uniqueness
             name=unit_name,
-            entity_category=None,
-            icon="mdi:gesture-tap-button",
+            entity_type="event",
         )
         
         super().__init__(api, description, unit)
+        
+        # Set icon
+        self._attr_icon = "mdi:gesture-tap-button"
         
         # Event entity specific attributes
         self._attr_event_types = [

@@ -185,6 +185,7 @@ class CasambiSwitchSensor(SensorEntity):
                 "unit_id": self._last_event_data.get("unit_id"),
                 "message_type": self._last_event_data.get("message_type"),
                 "flags": self._last_event_data.get("flags"),
+                "packet_sequence": self._last_event_data.get("packet_sequence"),
             })
         
         return attrs

@@ -215,14 +215,7 @@ action:
                       {% endif %}
                     calculated_step: "{{ adjusted_step * loop_direction_multiplier }}"
                     # Check if we've hit a limit for our direction
-                    at_limit: >
-                      {% if loop_direction_multiplier == 1 and current_brightness >= 254 %}
-                        true
-                      {% elif loop_direction_multiplier == -1 and current_brightness <= 1 %}
-                        true
-                      {% else %}
-                        false
-                      {% endif %}
+                    at_limit: "{{ (loop_direction_multiplier == 1 and current_brightness >= 254) or (loop_direction_multiplier == -1 and current_brightness <= 1) }}"
                 - choose:
                     - conditions:
                         - condition: template

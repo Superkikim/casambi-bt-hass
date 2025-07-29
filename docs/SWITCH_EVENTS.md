@@ -20,10 +20,9 @@ Switch button press/release events are fired as Home Assistant events that can b
 - **Press to Hold Delay**: Approximately 500-600ms
   - Short press (< 500ms): Fires `button_press` followed by `button_release`
   - Long press (> 500ms): Fires `button_press`, then `button_hold` events start after ~500ms, finally `button_release_after_hold` when released
-- **Hold Event Frequency**: `button_hold` events are filtered as duplicates
-  - Even though the Casambi protocol sends multiple hold events with incrementing counters, the integration filters them
-  - Only the first `button_hold` event is fired to Home Assistant
-  - This is why the dimming blueprint needs to use a loop rather than relying on multiple hold events
+- **Hold Event Frequency**: `button_hold` events repeat while the button is held
+  - The Casambi protocol sends multiple hold events with incrementing counters
+  - These events can be used for continuous actions like dimming
 
 ## Listening to Events
 You can monitor these events in Developer Tools → Events → Listen to events by entering `casambi_bt_switch_event` as the event type.
@@ -34,7 +33,7 @@ You can monitor these events in Developer Tools → Events → Listen to events 
 - **Message Type 8**: Usually valid button press/release events
 - **Message Type 16**: Sometimes also valid events - verify by listening to actual events from your switch
 
-**Important**: The event data fields are based on guesswork and may be incorrect. However, the values are consistent enough to be usable. Sometimes the `flags` field, combined with `unit_id`, `button`, and `message_type`, creates a unique combination that can be used to identify specific button actions.
+**Important**: The integration now correctly decodes switch events with proper button IDs that match what you see in the Casambi app. The improved parsing handles both standard firmware (lower nibble) and EVO firmware (upper nibble) switches automatically.
 
 **Tip**: You can use the Casambi app to configure switch button actions while simultaneously listening to events in Home Assistant. This allows you to:
 - Use Casambi's built-in button assignments for some actions
@@ -53,9 +52,10 @@ You can monitor these events in Developer Tools → Events → Listen to events 
    - `button`: The button number (0-based)
    - `action`: The event type (button_press, button_release, etc.)
 
-**Important Notes about Different Switch Types:**
-- **Wired Relays** (e.g., SC-TI-CAS, LD220WCM): Generate clean, expected events
-- **Battery Switches** (e.g., 4CHANNEL_SW EVO): May trigger additional events with random metadata due to unknown protocol specifications - simply ignore the excessive events
+**Important Notes about Switch Events:**
+- The integration now correctly extracts button IDs that match the Casambi app
+- Irrelevant notification events (button=0) are automatically filtered out
+- Both standard and EVO firmware switches are properly supported
 
 #### Method 2: Verifying Unit ID in Casambi App
 If you see multiple events with different `unit_id` values, verify the correct one:
@@ -68,8 +68,8 @@ If you see multiple events with different `unit_id` values, verify the correct o
 
 **Button Number Mapping**: The button number in Home Assistant events (0-based) may not directly match the Casambi app numbering. Always test each physical button and note its corresponding `button` value in the events.
 
-### Handling Duplicate Events
-The Casambi protocol may send multiple duplicate event packets for reliability. You'll need to implement debouncing in your automations to handle this. See the example automation below which includes a 2-second cooldown period to prevent duplicate triggers.
+### Event Deduplication
+The integration includes built-in event deduplication to prevent duplicate triggers. You can configure the deduplication window in the integration options (default: 600ms). This eliminates the need for complex debouncing logic in your automations.
 
 ### Event Reliability
 Button press and release events are **not guaranteed** to be captured due to the nature of Bluetooth communication:

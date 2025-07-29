@@ -37,6 +37,8 @@ An enhanced fork of the [original Casambi Bluetooth integration](https://github.
 
 ### 📱 Switch Button Events
 Physical switches fire events for automations:
+- **Correct button IDs** matching the Casambi app
+- **Clean events** - no more irrelevant switch notifications
 - Button press, hold, and release detection
 - ~500ms press-to-hold delay
 - Support for short/long press actions

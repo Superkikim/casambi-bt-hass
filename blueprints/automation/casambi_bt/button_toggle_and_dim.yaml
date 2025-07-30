@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Toggle and Dim
-  description: Short press to toggle light, hold to dim (combines toggle and dimming functionality) - v1.3.0
+  description: Short press to toggle light, hold to dim (combines toggle and dimming functionality) - v1.4.0
   domain: automation
   input:
     switch_sensor:
@@ -68,16 +68,6 @@ blueprint:
       selector:
         entity:
           domain: input_text
-    debounce_time:
-      name: Debounce Time
-      description: Minimum seconds between toggle actions (prevents accidental double-triggers)
-      default: 1
-      selector:
-        number:
-          min: 0.5
-          max: 5
-          step: 0.5
-          unit_of_measurement: seconds
 
 mode: parallel  # Allow multiple instances
 max: 3
@@ -89,7 +79,6 @@ variables:
   dimming_step: !input dimming_step
   dimming_interval: !input dimming_interval
   button_state_helper: !input button_state_helper
-  debounce_time: !input debounce_time
 
 trigger:
   - platform: state

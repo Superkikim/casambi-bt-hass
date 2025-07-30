@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Actions
-  description: Versatile button automation with customizable actions for different button events - v1.2.0
+  description: Versatile button automation with customizable actions for different button events - v1.3.0
   domain: automation
   input:
     switch_sensor:
@@ -85,18 +85,6 @@ blueprint:
           max: 1000
           step: 50
           unit_of_measurement: ms
-    
-    # Debounce
-    debounce_time:
-      name: Debounce Time
-      description: Minimum seconds between automation triggers
-      default: 0.5
-      selector:
-        number:
-          min: 0
-          max: 5
-          step: 0.1
-          unit_of_measurement: seconds
 
 mode: parallel
 max: 3
@@ -106,7 +94,6 @@ variables:
   button_state_helper: !input button_state_helper
   hold_action: !input hold_action
   hold_repeat_interval: !input hold_repeat_interval
-  debounce_time: !input debounce_time
 
 trigger:
   - platform: state
@@ -121,11 +108,8 @@ condition:
       {% set message_type_filter = message_type | default('') %}
       {% set event_message_type = trigger.to_state.attributes.message_type | default('') | string %}
       {% set message_match = (message_type_filter == '') or (message_type_filter == event_message_type) %}
-      {% set debounce = debounce_time | default(0.5) %}
-      {% set last_triggered = as_timestamp(state_attr(this.entity_id, 'last_triggered') | default(0)) %}
-      {% set time_passed = as_timestamp(now()) - last_triggered %}
       
-      {{ button_match and message_match and time_passed > debounce }}
+      {{ button_match and message_match }}
 
 action:
   - choose:

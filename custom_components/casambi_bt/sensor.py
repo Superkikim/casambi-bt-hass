@@ -23,10 +23,15 @@ from .entities import CasambiUnitEntity, TypedEntityDescription
 
 _LOGGER = logging.getLogger(__name__)
 
-# Define switch unit control types
-CASA_SWITCH_CTRL_TYPES = [
-    UnitControlType.SWITCH,
-    UnitControlType.PUSH_BUTTON,
+# Switch units typically have no control types or only ONOFF
+# They are identified by not having light control capabilities
+CASA_LIGHT_CTRL_TYPES = [
+    UnitControlType.DIMMER,
+    UnitControlType.RGB,
+    UnitControlType.WHITE,
+    UnitControlType.TEMPERATURE,
+    UnitControlType.XY,
+    UnitControlType.COLORSOURCE,
 ]
 
 
@@ -39,20 +44,25 @@ async def async_setup_entry(
     _LOGGER.debug("Setting up sensor entities for switch units")
     api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
     
-    # Find all switch units
+    # Find all switch units (units that are not lights)
     switch_units = []
     for unit in api.casa.units:
-        # Check if this is a switch unit
+        # A switch unit is one that doesn't have light control capabilities
+        is_light = False
         if unit.unitType and unit.unitType.controls:
             control_types = [uc.type for uc in unit.unitType.controls]
-            if any(ct in CASA_SWITCH_CTRL_TYPES for ct in control_types):
-                switch_units.append(unit)
-                _LOGGER.info(
-                    "Found switch unit: %s (ID: %s, UUID: %s)",
-                    unit.name,
-                    unit.deviceId,
-                    unit.uuid
-                )
+            # Check if it has any light control types
+            is_light = any(ct in CASA_LIGHT_CTRL_TYPES for ct in control_types)
+        
+        # If it's not a light and has a name, consider it a switch
+        if not is_light and unit.name:
+            switch_units.append(unit)
+            _LOGGER.info(
+                "Found switch unit: %s (ID: %s, UUID: %s)",
+                unit.name,
+                unit.deviceId,
+                unit.uuid
+            )
     
     # Create sensor entities for switch units
     sensors = []

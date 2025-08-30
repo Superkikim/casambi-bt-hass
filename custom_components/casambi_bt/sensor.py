@@ -1,38 +1,63 @@
-"""Sensor implementation for Casambi Switch Units."""
+"""Sensor platform for Casambi switch units."""
 
-from datetime import datetime
+from __future__ import annotations
+
 import logging
-from typing import Any, cast
+from typing import Any, Final
 
-from CasambiBt import Unit as CasambiUnit
-from CasambiBt import UnitControlType
+from CasambiBt import Unit
 
-from homeassistant.components.sensor import (
-    SensorDeviceClass,
-    SensorEntity,
-    SensorEntityDescription,
-    SensorStateClass,
-)
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.device_registry import DeviceInfo
 
-from . import DOMAIN, CasambiApi
-from .entities import CasambiUnitEntity, TypedEntityDescription
+from . import CasambiApi
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-# Switch units typically have no control types or only ONOFF
-# They are identified by not having light control capabilities
-CASA_LIGHT_CTRL_TYPES = [
-    UnitControlType.DIMMER,
-    UnitControlType.RGB,
-    UnitControlType.WHITE,
-    UnitControlType.TEMPERATURE,
-    UnitControlType.XY,
-    UnitControlType.COLORSOURCE,
-]
+# Known switch model keywords to identify switch units
+SWITCH_MODELS: Final[set[str]] = {
+    "switch",
+    "xpress",
+    "button",
+    "pushbutton",
+    "batteryswitch",
+    "wall switch",
+    "remote",
+}
+
+
+def _is_switch_unit(unit: Unit) -> bool:
+    """Check if a unit is a switch based on its model or manufacturer."""
+    if not unit.unitType:
+        return False
+        
+    # Check model name
+    model_lower = unit.unitType.model.lower() if unit.unitType.model else ""
+    if any(keyword in model_lower for keyword in SWITCH_MODELS):
+        return True
+    
+    # Check manufacturer
+    manufacturer_lower = unit.unitType.manufacturer.lower() if unit.unitType.manufacturer else ""
+    if "switch" in manufacturer_lower:
+        return True
+    
+    # Check if unit has no light controls (dimmer, rgb, etc)
+    # but still has controls (indicating it might be a switch)
+    light_controls = {
+        "DIMMER", "RGB", "WHITE", "TEMPERATURE", "XY", "COLORSOURCE"
+    }
+    unit_controls = {c.type.name for c in unit.unitType.controls} if unit.unitType.controls else set()
+    
+    # If it has controls but none are light controls, it might be a switch
+    if unit_controls and not unit_controls.intersection(light_controls):
+        return True
+    
+    return False
 
 
 async def async_setup_entry(
@@ -40,158 +65,169 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Casambi switch unit sensors."""
-    _LOGGER.debug("Setting up sensor entities for switch units")
-    api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
+    """Set up Casambi switch sensor entities."""
+    casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
     
-    # Find all switch units (units that are not lights)
-    switch_units = []
-    for unit in api.casa.units:
-        # A switch unit is one that doesn't have light control capabilities
-        is_light = False
-        if unit.unitType and unit.unitType.controls:
-            control_types = [uc.type for uc in unit.unitType.controls]
-            # Check if it has any light control types
-            is_light = any(ct in CASA_LIGHT_CTRL_TYPES for ct in control_types)
-        
-        # If it's not a light and has a name, consider it a switch
-        if not is_light and unit.name:
-            switch_units.append(unit)
-            _LOGGER.info(
-                "Found switch unit: %s (ID: %s, UUID: %s)",
-                unit.name,
-                unit.deviceId,
-                unit.uuid
-            )
+    # Get all units and filter for switches
+    switch_units = [unit for unit in casa_api.casa.units if _is_switch_unit(unit)]
     
-    # Create sensor entities for switch units
-    sensors = []
-    
-    # Create last event sensor for each switch unit
-    for unit in switch_units:
-        sensors.append(CasambiSwitchEventSensor(api, unit))
-        # Add diagnostic sensors
-        sensors.append(CasambiSwitchUnitIdSensor(api, unit))
-        if unit.firmware:
-            sensors.append(CasambiSwitchFirmwareSensor(api, unit))
-    
-    if sensors:
-        async_add_entities(sensors)
-        _LOGGER.info("Created %d sensor entities for %d switch units", 
-                     len(sensors), len(switch_units))
+    if switch_units:
+        _LOGGER.info(f"Found {len(switch_units)} switch units")
+        for unit in switch_units:
+            _LOGGER.debug(f"Switch unit: {unit.name} (ID: {unit.deviceId}, Model: {unit.unitType.model})")
     else:
         _LOGGER.debug("No switch units found in the network")
-
-
-class CasambiSwitchEventSensor(CasambiUnitEntity, SensorEntity):
-    """Sensor for tracking last switch event."""
     
-    def __init__(self, api: CasambiApi, unit: CasambiUnit) -> None:
-        """Initialize the switch event sensor."""
-        description = TypedEntityDescription(
-            key="last_event",
-            name="Last Event",
-            entity_type="last_event",
-            icon="mdi:button-pointer",
-        )
-        super().__init__(api, description, unit)
+    # Create sensor entities for each switch unit
+    sensor_entities = []
+    for unit in switch_units:
+        # Add last event sensor
+        sensor_entities.append(CasambiSwitchSensor(casa_api, unit))
+        # Add unit ID diagnostic sensor
+        sensor_entities.append(CasambiSwitchUnitIdSensor(casa_api, unit))
+    
+    if sensor_entities:
+        async_add_entities(sensor_entities)
+
+
+class CasambiSwitchSensor(SensorEntity):
+    """Sensor entity showing last event for a Casambi switch unit."""
+    
+    def __init__(self, api: CasambiApi, unit: Unit) -> None:
+        """Initialize the switch sensor entity."""
+        # Store references
+        self._api = api
+        self._unit = unit
+        
+        # Set entity attributes
+        self._attr_has_entity_name = True
+        self._attr_name = "Last Event"
+        self._attr_unique_id = f"{api.casa.networkId}-unit-{unit.uuid}-last-event"
+        self._attr_icon = "mdi:button-pointer"
         
         # Store last event data
         self._last_event_data: dict[str, Any] = {}
-        self._attr_native_value = "No event"
         
         # Register for switch events
-        if hasattr(api, 'register_switch_event_callback'):
-            api.register_switch_event_callback(self._handle_switch_event)
-            _LOGGER.debug("Registered switch event callback for unit %s", unit.deviceId)
+        self._api.register_switch_event_callback(self._handle_switch_event)
+    
+    async def async_will_remove_from_hass(self) -> None:
+        """Unregister handlers when entity is removed."""
+        self._api.unregister_switch_event_callback(self._handle_switch_event)
+        await super().async_will_remove_from_hass()
     
     @callback
-    def _handle_switch_event(self, event_data: dict) -> None:
-        """Handle switch events from the Casambi network."""
-        unit = cast(CasambiUnit, self._obj)
-        
+    def _handle_switch_event(self, event_data: dict[str, Any]) -> None:
+        """Handle incoming switch events."""
         # Check if this event is for our unit
-        if event_data.get("unit_id") != unit.deviceId:
+        if event_data.get("unit_id") != self._unit.deviceId:
             return
         
-        # Update the sensor with new event data
-        button = event_data.get("button", 0)
-        action = event_data.get("event", "unknown")
-        timestamp = datetime.now().isoformat()
-        
-        # Create state value that includes timestamp to ensure it always changes
-        self._attr_native_value = f"button_{button}_{action}_{timestamp}"
-        
-        # Store full event data as attributes
-        self._last_event_data = {
-            "button": button,
-            "action": action,
-            "timestamp": timestamp,
-            "unit_id": event_data.get("unit_id"),
-            "message_type": f"0x{event_data.get('message_type', 0):02x}",
-            "flags": f"0x{event_data.get('flags', 0):02x}",
-            "packet_sequence": event_data.get("packet_sequence"),
-            "raw_packet": event_data.get("raw_packet"),
-        }
-        
         _LOGGER.debug(
-            "Switch event for unit %s: button=%s, action=%s",
-            unit.deviceId,
-            button,
-            action
+            f"Switch sensor event for {self._unit.name}: button={event_data.get('button')}, "
+            f"event={event_data.get('event')}"
         )
         
-        # Trigger state update
-        self.schedule_update_ha_state()
+        # Store the event data
+        self._last_event_data = event_data
+        
+        # Update the entity state
+        self.async_write_ha_state()
+    
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._unit.uuid)},
+            name=self._unit.name,
+            manufacturer=self._unit.unitType.manufacturer if self._unit.unitType else "Casambi",
+            model=self._unit.unitType.model if self._unit.unitType else "Switch",
+            sw_version=self._unit.firmwareVersion if hasattr(self._unit, 'firmwareVersion') else None,
+            via_device=(DOMAIN, self._api.casa.networkId),
+        )
+    
+    @property
+    def native_value(self) -> str:
+        """Return the state showing last event info."""
+        if not self._last_event_data:
+            return "No events"
+        
+        button = self._last_event_data.get("button", "?")
+        event_type = self._last_event_data.get("event", "unknown")
+        
+        # Create a readable state string
+        event_map = {
+            "button_press": "pressed",
+            "button_hold": "held",
+            "button_release": "released",
+            "button_release_after_hold": "released (held)",
+        }
+        
+        event_text = event_map.get(event_type, event_type)
+        return f"Button {button} {event_text}"
     
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
-        return self._last_event_data
-    
-    async def async_added_to_hass(self) -> None:
-        """Run when entity is added to hass."""
-        await super().async_added_to_hass()
-        unit = cast(CasambiUnit, self._obj)
-        _LOGGER.debug("Switch event sensor added for unit %s", unit.name)
-    
-    async def async_will_remove_from_hass(self) -> None:
-        """Run when entity will be removed from hass."""
-        await super().async_will_remove_from_hass()
-        # Unregister callback if needed
-        if hasattr(self._api, 'unregister_switch_event_callback'):
-            self._api.unregister_switch_event_callback(self._handle_switch_event)
-
-
-class CasambiSwitchUnitIdSensor(CasambiUnitEntity, SensorEntity):
-    """Diagnostic sensor showing unit ID."""
-    
-    def __init__(self, api: CasambiApi, unit: CasambiUnit) -> None:
-        """Initialize the unit ID sensor."""
-        description = TypedEntityDescription(
-            key="unit_id",
-            name="Unit ID",
-            entity_type="unit_id",
-            icon="mdi:identifier",
-        )
-        super().__init__(api, description, unit)
+        attrs = {}
         
+        # Add all event data if available
+        if self._last_event_data:
+            attrs.update({
+                "event_type": self._last_event_data.get("event"),
+                "action": self._last_event_data.get("event"),  # Match HA event format
+                "button": self._last_event_data.get("button"),
+                "unit_id": self._last_event_data.get("unit_id"),
+                "message_type": self._last_event_data.get("message_type"),
+                "flags": self._last_event_data.get("flags"),
+                "packet_sequence": self._last_event_data.get("packet_sequence"),
+                "raw_packet": self._last_event_data.get("raw_packet"),
+            })
+        
+        # Add unit information
+        attrs.update({
+            "device_id": self._unit.deviceId,
+            "online": self._unit.online if hasattr(self._unit, 'online') else None,
+        })
+        
+        return attrs
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._api.available
+
+
+class CasambiSwitchUnitIdSensor(SensorEntity):
+    """Diagnostic sensor showing the unit ID for a Casambi switch."""
+    
+    def __init__(self, api: CasambiApi, unit: Unit) -> None:
+        """Initialize the unit ID sensor."""
+        # Store references
+        self._api = api
+        self._unit = unit
+        
+        # Set entity attributes
+        self._attr_has_entity_name = True
+        self._attr_name = "Unit ID"
+        self._attr_unique_id = f"{api.casa.networkId}-unit-{unit.uuid}-unit-id"
+        self._attr_icon = "mdi:identifier"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_native_value = str(unit.deviceId)
-
-
-class CasambiSwitchFirmwareSensor(CasambiUnitEntity, SensorEntity):
-    """Diagnostic sensor showing firmware version."""
     
-    def __init__(self, api: CasambiApi, unit: CasambiUnit) -> None:
-        """Initialize the firmware sensor."""
-        description = TypedEntityDescription(
-            key="firmware",
-            name="Firmware",
-            entity_type="firmware",
-            icon="mdi:chip",
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._unit.uuid)},
+            name=self._unit.name,
+            manufacturer=self._unit.unitType.manufacturer if self._unit.unitType else "Casambi",
+            model=self._unit.unitType.model if self._unit.unitType else "Switch",
+            sw_version=self._unit.firmwareVersion if hasattr(self._unit, 'firmwareVersion') else None,
+            via_device=(DOMAIN, self._api.casa.networkId),
         )
-        super().__init__(api, description, unit)
-        
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        self._attr_native_value = unit.firmware or "Unknown"
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._api.available

@@ -19,16 +19,18 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-# Button action type mappings
+# Button action type mappings (based on real network data)
 BUTTON_ACTIONS: Final[dict[int, str]] = {
-    0: "Not configured",
-    1: "Control Scene",
-    2: "Control Unit", 
-    3: "Control Group",
-    4: "Control All Units",
-    5: "Control Unit Element",
-    6: "Resume Automation",
-    7: "Resume Automation Group",
+    0: "Control Unit",
+    1: "Control Group", 
+    2: "Control Scene",
+    3: "All Units Off",
+    4: "All Units Dim",
+    5: "Not Configured",
+    6: "Block",
+    7: "Group",
+    8: "Scene List",
+    9: "All Units",
 }
 
 
@@ -61,8 +63,8 @@ def _is_switch_unit(unit: Unit) -> bool:
     return False
 
 
-def _get_unit_switch_config(raw_network_data: dict | None, unit_id: int) -> dict | None:
-    """Extract switch configuration for a specific unit from network data."""
+def _get_unit_data(raw_network_data: dict | None, unit_id: int) -> dict | None:
+    """Get the complete unit data from network data."""
     if not raw_network_data:
         return None
     
@@ -71,9 +73,38 @@ def _get_unit_switch_config(raw_network_data: dict | None, unit_id: int) -> dict
     
     for unit_data in units:
         if unit_data.get("deviceID") == unit_id:
-            return unit_data.get("switchConfig")
+            return unit_data
     
     return None
+
+
+def _get_button_configs(unit_data: dict | None) -> list[dict[str, Any]]:
+    """Extract button configurations from unit data.
+    
+    Returns a list of button configs with index, type, and target.
+    """
+    if not unit_data:
+        return []
+    
+    buttons = []
+    
+    # Check for pushButton fields (standard switch format)
+    button_fields = ["pushButton", "pushButton2", "pushButton3", "pushButton4"]
+    for field in button_fields:
+        if field in unit_data:
+            button_config = unit_data[field]
+            # Button config can be a dict or might be simplified
+            if isinstance(button_config, dict):
+                buttons.append(button_config)
+    
+    # Check for switchConfig.switches (Xpress switch format)
+    switch_config = unit_data.get("switchConfig", {})
+    if "switches" in switch_config:
+        for switch in switch_config["switches"]:
+            if isinstance(switch, dict):
+                buttons.append(switch)
+    
+    return buttons
 
 
 def _resolve_target_name(
@@ -82,37 +113,37 @@ def _resolve_target_name(
     target: int
 ) -> str:
     """Resolve target ID to a name based on action type."""
-    if not raw_network_data or target == 0:
+    if not raw_network_data:
         return ""
     
     network = raw_network_data.get("network", {})
     
-    # Scene
-    if action == 1:
-        scenes = network.get("scenes", [])
-        for scene in scenes:
-            if scene.get("sceneID") == target:
-                return scene.get("name", f"Scene {target}")
-        return f"Scene {target}"
-    
-    # Unit
-    elif action == 2:
+    # Unit (type 0)
+    if action == 0:
         units = network.get("units", [])
         for unit in units:
             if unit.get("deviceID") == target:
                 return unit.get("name", f"Unit {target}")
         return f"Unit {target}"
     
-    # Group
-    elif action == 3:
+    # Group (type 1 or 7)
+    elif action in [1, 7]:
         cells = network.get("grid", {}).get("cells", [])
         for cell in cells:
             if cell.get("type") == 2 and cell.get("groupID") == target:
                 return cell.get("name", f"Group {target}")
         return f"Group {target}"
     
-    # All units (target is usually 255)
-    elif action == 4:
+    # Scene (type 2)
+    elif action == 2:
+        scenes = network.get("scenes", [])
+        for scene in scenes:
+            if scene.get("sceneID") == target:
+                return scene.get("name", f"Scene {target}")
+        return f"Scene {target}"
+    
+    # All units off/dim (type 3, 4, 9)
+    elif action in [3, 4, 9]:
         return ""
     
     return ""
@@ -133,21 +164,22 @@ async def async_setup_entry(
     
     sensor_entities = []
     for unit in switch_units:
-        # Get switch config for this unit
-        switch_config = _get_unit_switch_config(
+        # Get complete unit data
+        unit_data = _get_unit_data(
             casa_api.casa.rawNetworkData, 
             unit.deviceId
         )
         
-        if switch_config:
-            # Create button action sensors (always 1-4, 5-8 if configured)
-            buttons = switch_config.get("buttons", [])
+        if unit_data:
+            # Get button configurations
+            button_configs = _get_button_configs(unit_data)
             
-            # Always create sensors for buttons 1-4
+            # Create button action sensors for buttons 1-4 (always)
             for button_num in range(1, 5):
+                # Find config for this button index
                 button_config = next(
-                    (b for b in buttons if b.get("type") == button_num - 1), 
-                    {"type": button_num - 1, "action": 0, "target": 0}
+                    (b for b in button_configs if b.get("index") == button_num), 
+                    {"index": button_num, "type": 5, "unitID": 0}  # Default: Not configured
                 )
                 sensor_entities.append(
                     CasambiButtonActionSensor(
@@ -155,22 +187,25 @@ async def async_setup_entry(
                     )
                 )
             
-            # Create sensors for buttons 5-8 only if configured
+            # Check if there are buttons 5-8 configured
             for button_num in range(5, 9):
                 button_config = next(
-                    (b for b in buttons if b.get("type") == button_num - 1), 
+                    (b for b in button_configs if b.get("index") == button_num), 
                     None
                 )
-                if button_config and button_config.get("action", 0) != 0:
+                if button_config and button_config.get("type", 5) != 5:  # 5 = Not configured
                     sensor_entities.append(
                         CasambiButtonActionSensor(
                             casa_api, unit, button_num, button_config
                         )
                     )
             
-            # Create raw config sensor for the switch
+            # Get switchConfig for settings
+            switch_config = unit_data.get("switchConfig", {})
+            
+            # Create raw config sensor
             sensor_entities.append(
-                CasambiSwitchRawConfigSensor(casa_api, unit, switch_config)
+                CasambiSwitchRawConfigSensor(casa_api, unit, unit_data)
             )
             
             # Create settings sensor
@@ -221,19 +256,20 @@ class CasambiButtonActionSensor(SensorEntity):
     @property
     def native_value(self) -> str:
         """Return the button action as readable text."""
-        action = self._button_config.get("action", 0)
-        target = self._button_config.get("target", 0)
+        action_type = self._button_config.get("type", 5)
+        # Use unitID for most actions, groupID for group actions
+        target = self._button_config.get("unitID") or self._button_config.get("groupID", 0)
         
-        action_text = BUTTON_ACTIONS.get(action, f"Unknown ({action})")
+        action_text = BUTTON_ACTIONS.get(action_type, f"Unknown ({action_type})")
         
-        if action == 0:
+        if action_type == 5:  # Not configured
             return "Not configured"
-        elif action == 4:
-            return "All Units"
+        elif action_type in [3, 4, 9]:  # All units actions
+            return action_text
         else:
             target_name = _resolve_target_name(
                 self._api.casa.rawNetworkData, 
-                action, 
+                action_type, 
                 target
             )
             if target_name:
@@ -244,11 +280,15 @@ class CasambiButtonActionSensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional attributes."""
+        action_type = self._button_config.get("type", 5)
+        target = self._button_config.get("unitID") or self._button_config.get("groupID", 0)
+        
         return {
             "button_number": self._button_number,
-            "action_type": self._button_config.get("action", 0),
-            "action_name": BUTTON_ACTIONS.get(self._button_config.get("action", 0)),
-            "target_id": self._button_config.get("target", 0),
+            "button_index": self._button_config.get("index", self._button_number),
+            "action_type": action_type,
+            "action_name": BUTTON_ACTIONS.get(action_type),
+            "target_id": target,
             "raw_config": self._button_config
         }
 
@@ -260,12 +300,13 @@ class CasambiSwitchRawConfigSensor(SensorEntity):
         self, 
         api: CasambiApi, 
         unit: Unit,
-        switch_config: dict[str, Any]
+        unit_data: dict[str, Any]
     ) -> None:
         """Initialize the raw config sensor."""
         self._api = api
         self._unit = unit
-        self._switch_config = switch_config
+        self._unit_data = unit_data
+        self._button_configs = _get_button_configs(unit_data)
         
         # Set entity attributes
         self._attr_has_entity_name = True
@@ -291,19 +332,30 @@ class CasambiSwitchRawConfigSensor(SensorEntity):
     @property
     def native_value(self) -> str:
         """Return summary of switch configuration."""
-        buttons = self._switch_config.get("buttons", [])
-        configured_count = sum(1 for b in buttons if b.get("action", 0) != 0)
+        configured_count = sum(1 for b in self._button_configs if b.get("type", 5) != 5)
         return f"{configured_count} buttons configured"
     
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the raw switch configuration."""
+        # Extract relevant switch-related fields
+        switch_fields = {}
+        
+        # Include pushButton fields
+        for field in ["pushButton", "pushButton2", "pushButton3", "pushButton4"]:
+            if field in self._unit_data:
+                switch_fields[field] = self._unit_data[field]
+        
+        # Include switchConfig if present
+        if "switchConfig" in self._unit_data:
+            switch_fields["switchConfig"] = self._unit_data["switchConfig"]
+        
         return {
-            "raw_switch_config": self._switch_config,
-            "button_count": len(self._switch_config.get("buttons", [])),
+            "raw_switch_config": switch_fields,
+            "button_configs": self._button_configs,
             "configured_buttons": sum(
-                1 for b in self._switch_config.get("buttons", []) 
-                if b.get("action", 0) != 0
+                1 for b in self._button_configs
+                if b.get("type", 5) != 5
             )
         }
 

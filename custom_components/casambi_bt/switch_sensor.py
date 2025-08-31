@@ -44,8 +44,9 @@ def _is_switch_unit(unit: Unit) -> bool:
     
     # Check if unit has no light controls (dimmer, rgb, etc)
     # but still has controls (indicating it might be a switch)
+    # ONOFF is included as it's an actuator control, not a switch indicator
     light_controls = {
-        "DIMMER", "RGB", "WHITE", "TEMPERATURE", "XY", "COLORSOURCE"
+        "DIMMER", "RGB", "WHITE", "TEMPERATURE", "XY", "COLORSOURCE", "ONOFF"
     }
     unit_controls = {c.type.name for c in unit.unitType.controls}
     

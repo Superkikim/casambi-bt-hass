@@ -89,12 +89,20 @@ def _get_button_configs(unit_data: dict | None) -> list[dict[str, Any]]:
     buttons = []
     
     # Check for pushButton fields (standard switch format)
-    button_fields = ["pushButton", "pushButton2", "pushButton3", "pushButton4"]
-    for field in button_fields:
-        if field in unit_data:
-            button_config = unit_data[field]
+    button_fields = [
+        ("pushButton", 1),
+        ("pushButton2", 2),
+        ("pushButton3", 3),
+        ("pushButton4", 4)
+    ]
+    for field_name, button_index in button_fields:
+        if field_name in unit_data:
+            button_config = unit_data[field_name]
             # Button config can be a dict or might be simplified
             if isinstance(button_config, dict):
+                # Ensure index is set based on field name
+                button_config = button_config.copy()
+                button_config["index"] = button_index
                 buttons.append(button_config)
     
     # Check for switchConfig.switches (Xpress switch format)
@@ -102,7 +110,11 @@ def _get_button_configs(unit_data: dict | None) -> list[dict[str, Any]]:
     if "switches" in switch_config:
         for switch in switch_config["switches"]:
             if isinstance(switch, dict):
-                buttons.append(switch)
+                # Convert 0-based index to 1-based button number
+                switch_copy = switch.copy()
+                if "index" in switch_copy:
+                    switch_copy["index"] = switch_copy["index"] + 1
+                buttons.append(switch_copy)
     
     return buttons
 
@@ -257,8 +269,8 @@ class CasambiButtonActionSensor(SensorEntity):
     def native_value(self) -> str:
         """Return the button action as readable text."""
         action_type = self._button_config.get("type", 5)
-        # Use unitID for most actions, groupID for group actions
-        target = self._button_config.get("unitID") or self._button_config.get("groupID", 0)
+        # Use unit for unit actions, group for group actions
+        target = self._button_config.get("unit") or self._button_config.get("group", 0)
         
         action_text = BUTTON_ACTIONS.get(action_type, f"Unknown ({action_type})")
         
@@ -281,7 +293,7 @@ class CasambiButtonActionSensor(SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional attributes."""
         action_type = self._button_config.get("type", 5)
-        target = self._button_config.get("unitID") or self._button_config.get("groupID", 0)
+        target = self._button_config.get("unit") or self._button_config.get("group", 0)
         
         return {
             "button_number": self._button_number,

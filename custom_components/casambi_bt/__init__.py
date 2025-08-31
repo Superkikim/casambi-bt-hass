@@ -5,10 +5,12 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable, Iterable
 import contextlib
+import json
 import logging
 from pathlib import Path
 import time
 from typing import Final
+import yaml
 
 from CasambiBt import Casambi, Group, Scene, Unit, UnitControlType
 from CasambiBt.errors import AuthenticationError, BluetoothError, NetworkNotFoundError
@@ -16,7 +18,7 @@ from CasambiBt.errors import AuthenticationError, BluetoothError, NetworkNotFoun
 from homeassistant.components import bluetooth
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, CONF_PASSWORD
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryError,
@@ -128,7 +130,74 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # Register services
+    await async_setup_services(hass)
+
     return True
+
+
+async def async_setup_services(hass: HomeAssistant) -> None:
+    """Set up services for the Casambi integration."""
+    
+    # Check if services are already registered
+    if hass.services.has_service(DOMAIN, "get_network_config"):
+        return
+
+    async def handle_get_network_config(call: ServiceCall) -> dict:
+        """Handle the get_network_config service call."""
+        unit_id = call.data.get("unit_id")
+        output_format = call.data.get("format", "json")
+        
+        # Get the first configured entry (could be enhanced to support multiple)
+        entries = hass.config_entries.async_entries(DOMAIN)
+        if not entries:
+            raise ValueError("No Casambi integration configured")
+        
+        entry = entries[0]
+        casa_api: CasambiApi = hass.data[DOMAIN][entry.entry_id]
+        
+        # Get the raw network data
+        raw_data = casa_api.casa.rawNetworkData
+        if not raw_data:
+            raise ValueError("No network data available")
+        
+        # If unit_id is specified, extract just that unit's data
+        if unit_id is not None:
+            network = raw_data.get("network", {})
+            units = network.get("units", [])
+            
+            unit_data = None
+            for unit in units:
+                if unit.get("deviceID") == unit_id:
+                    unit_data = unit
+                    break
+            
+            if not unit_data:
+                raise ValueError(f"Unit with ID {unit_id} not found")
+            
+            result_data = {
+                "unit": unit_data,
+                "network_id": casa_api.casa.networkId,
+                "network_name": casa_api.casa.networkName,
+            }
+        else:
+            # Return full network config
+            result_data = raw_data
+        
+        # Format the output
+        if output_format == "yaml":
+            return {"config": yaml.dump(result_data, default_flow_style=False)}
+        else:
+            return {"config": json.dumps(result_data, indent=2)}
+    
+    # Register the service
+    hass.services.async_register(
+        DOMAIN,
+        "get_network_config",
+        handle_get_network_config,
+        supports_response="only",
+    )
+    _LOGGER.info("Registered get_network_config service")
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

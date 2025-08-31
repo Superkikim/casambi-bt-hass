@@ -1,0 +1,25 @@
+get_network_config:
+  name: Get Network Configuration
+  description: Get the raw network configuration data from Casambi
+  fields:
+    unit_id:
+      name: Unit ID
+      description: Optional unit ID to get configuration for a specific unit. If not provided, returns full network configuration.
+      required: false
+      example: 6
+      selector:
+        number:
+          min: 0
+          max: 65535
+          mode: box
+    format:
+      name: Format
+      description: Output format for the configuration data
+      required: false
+      default: json
+      example: yaml
+      selector:
+        select:
+          options:
+            - json
+            - yaml

@@ -8,6 +8,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .network_sensor import async_setup_entry as async_setup_network_sensors
+from .switch_config_sensor import async_setup_entry as async_setup_switch_config_sensors
 from .switch_sensor import async_setup_entry as async_setup_switch_sensors
 
 _LOGGER = logging.getLogger(__name__)
@@ -19,5 +21,11 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Casambi sensor entities."""
-    # Set up switch sensors
+    # Set up network configuration sensor
+    await async_setup_network_sensors(hass, config_entry, async_add_entities)
+    
+    # Set up switch configuration sensors
+    await async_setup_switch_config_sensors(hass, config_entry, async_add_entities)
+    
+    # Set up switch event sensors
     await async_setup_switch_sensors(hass, config_entry, async_add_entities)

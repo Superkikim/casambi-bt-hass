@@ -139,65 +139,178 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_setup_services(hass: HomeAssistant) -> None:
     """Set up services for the Casambi integration."""
     
-    # Check if services are already registered
-    if hass.services.has_service(DOMAIN, "get_network_config"):
-        return
-
-    async def handle_get_network_config(call: ServiceCall) -> dict:
-        """Handle the get_network_config service call."""
-        unit_id = call.data.get("unit_id")
-        output_format = call.data.get("format", "json")
-        
-        # Get the first configured entry (could be enhanced to support multiple)
-        entries = hass.config_entries.async_entries(DOMAIN)
-        if not entries:
-            raise ValueError("No Casambi integration configured")
-        
-        entry = entries[0]
-        casa_api: CasambiApi = hass.data[DOMAIN][entry.entry_id]
-        
-        # Get the raw network data
-        raw_data = casa_api.casa.rawNetworkData
-        if not raw_data:
-            raise ValueError("No network data available")
-        
-        # If unit_id is specified, extract just that unit's data
-        if unit_id is not None:
-            network = raw_data.get("network", {})
-            units = network.get("units", [])
+    # Register get_network_config service if not already registered
+    if not hass.services.has_service(DOMAIN, "get_network_config"):
+        async def handle_get_network_config(call: ServiceCall) -> dict:
+            """Handle the get_network_config service call."""
+            unit_id = call.data.get("unit_id")
+            output_format = call.data.get("format", "json")
             
-            unit_data = None
-            for unit in units:
-                if unit.get("deviceID") == unit_id:
-                    unit_data = unit
-                    break
+            # Get the first configured entry (could be enhanced to support multiple)
+            entries = hass.config_entries.async_entries(DOMAIN)
+            if not entries:
+                raise ValueError("No Casambi integration configured")
             
-            if not unit_data:
-                raise ValueError(f"Unit with ID {unit_id} not found")
+            entry = entries[0]
+            casa_api: CasambiApi = hass.data[DOMAIN][entry.entry_id]
             
-            result_data = {
-                "unit": unit_data,
-                "network_id": casa_api.casa.networkId,
-                "network_name": casa_api.casa.networkName,
-            }
-        else:
-            # Return full network config
-            result_data = raw_data
+            # Get the raw network data
+            raw_data = casa_api.casa.rawNetworkData
+            if not raw_data:
+                raise ValueError("No network data available")
+            
+            # If unit_id is specified, extract just that unit's data
+            if unit_id is not None:
+                network = raw_data.get("network", {})
+                units = network.get("units", [])
+                
+                unit_data = None
+                for unit in units:
+                    if unit.get("deviceID") == unit_id:
+                        unit_data = unit
+                        break
+                
+                if not unit_data:
+                    raise ValueError(f"Unit with ID {unit_id} not found")
+                
+                result_data = {
+                    "unit": unit_data,
+                    "network_id": casa_api.casa.networkId,
+                    "network_name": casa_api.casa.networkName,
+                }
+            else:
+                # Return full network config
+                result_data = raw_data
+            
+            # Format the output
+            if output_format == "yaml":
+                return {"config": yaml.dump(result_data, default_flow_style=False)}
+            else:
+                return {"config": json.dumps(result_data, indent=2)}
         
-        # Format the output
-        if output_format == "yaml":
-            return {"config": yaml.dump(result_data, default_flow_style=False)}
-        else:
-            return {"config": json.dumps(result_data, indent=2)}
+        # Register the service
+        hass.services.async_register(
+            DOMAIN,
+            "get_network_config",
+            handle_get_network_config,
+            supports_response="only",
+        )
+        _LOGGER.info("Registered get_network_config service")
     
-    # Register the service
-    hass.services.async_register(
-        DOMAIN,
-        "get_network_config",
-        handle_get_network_config,
-        supports_response="only",
-    )
-    _LOGGER.info("Registered get_network_config service")
+    # Register update_button_config service if not already registered
+    if not hass.services.has_service(DOMAIN, "update_button_config"):
+        async def handle_update_button_config(call: ServiceCall) -> None:
+            """Handle the update_button_config service call."""
+            unit_id = call.data.get("unit_id")
+            button_index = call.data.get("button_index")
+            action_type = call.data.get("action_type")
+            target_unit_id = call.data.get("target_unit_id")
+            
+            # Get the first available CasambiApi instance
+            casa_api = None
+            for entry_id in hass.data.get(DOMAIN, {}):
+                casa_api = hass.data[DOMAIN][entry_id]
+                break
+            
+            if not casa_api:
+                raise ValueError("No Casambi connection available")
+            
+            # Update cached button config in library
+            await casa_api.casa.update_button_config(
+                unit_id=unit_id,
+                button_index=button_index,
+                action_type=action_type,
+                target_id=target_unit_id,
+            )
+
+            _LOGGER.info(
+                "Updated button %s on unit %s to %s targeting %s (cache)",
+                button_index,
+                unit_id,
+                action_type,
+                target_unit_id,
+            )
+
+            # Immediately apply the switchConfig to the device (auto method)
+            try:
+                # Fast path: try SetParameter first with default tag 1
+                await casa_api.casa.apply_switch_config_ble(unit_id=unit_id, parameter_tag=1)
+                _LOGGER.info(
+                    "Applied switchConfig via SetParameter after update (unit=%s, tag=1)", unit_id
+                )
+            except Exception as e:
+                _LOGGER.info(
+                    "SetParameter apply failed for unit %s after update (%s). Falling back to ExtPacket.",
+                    unit_id,
+                    e,
+                )
+                await casa_api.casa.apply_switch_config_ble_large(unit_id=unit_id)
+                _LOGGER.info(
+                    "Applied switchConfig via ExtPacket after update (unit=%s)", unit_id
+                )
+    
+        # Register the update_button_config service
+        hass.services.async_register(
+            DOMAIN,
+            "update_button_config",
+            handle_update_button_config,
+        )
+        _LOGGER.info("Registered update_button_config service")
+
+    # Register apply_switch_config service if not already registered
+    if not hass.services.has_service(DOMAIN, "apply_switch_config"):
+        async def handle_apply_switch_config(call: ServiceCall) -> None:
+            """Handle the apply_switch_config service call."""
+            unit_id = call.data.get("unit_id")
+            method = (call.data.get("method") or "auto").lower()
+            parameter_tag = call.data.get("parameter_tag")
+
+            # Get the first available CasambiApi instance
+            casa_api = None
+            for entry_id in hass.data.get(DOMAIN, {}):
+                casa_api = hass.data[DOMAIN][entry_id]
+                break
+            if not casa_api:
+                raise ValueError("No Casambi connection available")
+
+            if method == "set_parameter":
+                tag = 1 if parameter_tag is None else int(parameter_tag)
+                await casa_api.casa.apply_switch_config_ble(unit_id=unit_id, parameter_tag=tag)
+                _LOGGER.info(
+                    "Applied switchConfig via SetParameter (unit=%s, tag=%s)", unit_id, tag
+                )
+            elif method == "ext":
+                await casa_api.casa.apply_switch_config_ble_large(unit_id=unit_id)
+                _LOGGER.info(
+                    "Applied switchConfig via ExtPacket (unit=%s)", unit_id
+                )
+            else:
+                # Auto: try SetParameter first, fall back to ExtPacket on size error
+                try:
+                    tag = 1 if parameter_tag is None else int(parameter_tag)
+                    await casa_api.casa.apply_switch_config_ble(unit_id=unit_id, parameter_tag=tag)
+                    _LOGGER.info(
+                        "Applied switchConfig via SetParameter (unit=%s, tag=%s)", unit_id, tag
+                    )
+                except Exception as e:
+                    # Fallback to ext method on size or protocol error
+                    _LOGGER.info(
+                        "SetParameter failed for unit %s (%s). Falling back to ExtPacket.",
+                        unit_id,
+                        e,
+                    )
+                    await casa_api.casa.apply_switch_config_ble_large(unit_id=unit_id)
+                    _LOGGER.info(
+                        "Applied switchConfig via ExtPacket (unit=%s)", unit_id
+                    )
+
+        # Register the apply_switch_config service
+        hass.services.async_register(
+            DOMAIN,
+            "apply_switch_config",
+            handle_apply_switch_config,
+        )
+        _LOGGER.info("Registered apply_switch_config service")
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

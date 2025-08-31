@@ -23,3 +23,90 @@ get_network_config:
           options:
             - json
             - yaml
+
+update_button_config:
+  name: Update Button Configuration
+  description: Update a button on a Casambi switch unit and immediately apply the change to the device (auto method)
+  fields:
+    unit_id:
+      name: Unit ID
+      description: The ID of the switch unit with the button to configure
+      required: true
+      example: 31
+      selector:
+        number:
+          min: 0
+          max: 65535
+          mode: box
+    button_index:
+      name: Button Index
+      description: The index of the button to configure (0-based, e.g., 0 for button 1, 1 for button 2)
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 0
+          max: 7
+          mode: box
+    action_type:
+      name: Action Type
+      description: The type of action for the button (use 'none' to disable the button)
+      required: true
+      default: control_unit
+      example: control_unit
+      selector:
+        select:
+          options:
+            - none
+            - control_unit
+            - scene
+            - control_group
+            - all_units
+            - resume_automation
+            - resume_automation_group
+    target_unit_id:
+      name: Target Unit ID
+      description: The ID of the target unit (required for control_unit action)
+      required: false
+      example: 18
+      selector:
+        number:
+          min: 0
+          max: 65535
+          mode: box
+
+apply_switch_config:
+  name: Apply Switch Configuration
+  description: Push the cached switchConfig for a unit to the device over BLE
+  fields:
+    unit_id:
+      name: Unit ID
+      description: The ID of the switch unit to apply the configuration to
+      required: true
+      example: 31
+      selector:
+        number:
+          min: 0
+          max: 65535
+          mode: box
+    method:
+      name: Method
+      description: Choose how to apply the configuration
+      required: false
+      default: auto
+      selector:
+        select:
+          options:
+            - auto
+            - set_parameter
+            - ext
+    parameter_tag:
+      name: Parameter Tag
+      description: Optional tag for SetParameter method (ignored for ext)
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 0
+          max: 255
+          mode: box

@@ -116,8 +116,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         payload_hex = event.get("payload_hex")
         extra_data = event.get("extra_data")
 
-        payload_hex_str = payload_hex if isinstance(payload_hex, str) else (
-            payload_hex.hex() if isinstance(payload_hex, bytes) else payload_hex
+        # The library provides ASCII-hex bytes for raw_packet/decrypted_data/payload_hex.
+        # Convert bytes -> str via ASCII decode directly (not .hex()).
+        raw_packet_str = (
+            raw_packet.decode("ascii") if isinstance(raw_packet, (bytes, bytearray)) else raw_packet
+        )
+        decrypted_data_str = (
+            decrypted_data.decode("ascii") if isinstance(decrypted_data, (bytes, bytearray)) else decrypted_data
+        )
+        payload_hex_str = (
+            payload_hex.decode("ascii") if isinstance(payload_hex, (bytes, bytearray)) else payload_hex
         )
 
         # Dedup logic
@@ -158,8 +166,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "flags": event.get("flags"),
                 "packet_sequence": event.get("packet_sequence"),
                 "arrival_sequence": event.get("arrival_sequence"),
-                "raw_packet": raw_packet,
-                "decrypted_data": decrypted_data,
+                "raw_packet": raw_packet_str,
+                "decrypted_data": decrypted_data_str,
                 "message_position": event.get("message_position"),
                 "payload_hex": payload_hex_str,
                 "extra_data": extra_data.hex() if isinstance(extra_data, bytes) else extra_data,

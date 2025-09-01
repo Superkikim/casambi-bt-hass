@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Toggle and Dim
-  description: Short press to toggle light, hold to dim (combines toggle and dimming functionality). Robust to out-of-order/missing press events - v1.3.0
+  description: Short press to toggle light, hold to dim (combines toggle and dimming functionality). Robust to out-of-order/missing press events - v1.3.1
   domain: automation
   input:
     unit_id:
@@ -183,6 +183,7 @@ action:
               direction_setting: !input dimming_direction
               current_brightness: "{{ state_attr(light_entity, 'brightness') | int(0) }}"
               should_dim_up: "{{ direction_setting == 'up' or (direction_setting == 'toggle' and (states(light_entity) == 'off' or current_brightness <= 127)) }}"
+
           
           # Choose which dimming loop to execute based on direction
           - choose:
@@ -204,11 +205,17 @@ action:
                                 {% set brightness = state_attr(light, 'brightness') | int(0) %}
                                 {{ states(light) == 'on' and brightness < 255 }}
                       sequence:
+                        - variables:
+                            current_brightness: "{{ state_attr(target_light, 'brightness') | int(0) }}"
+                            base_brightness: >
+                              {{ 1 if states(target_light) == 'off' or current_brightness == 0 else current_brightness }}
+                            step_val: "{{ dimming_step | int(25) }}"
+                            next_brightness: "{{ [ base_brightness + step_val, 255 ] | min }}"
                         - service: light.turn_on
                           target:
                             entity_id: !input target_light
                           data:
-                            brightness_step_pct: "{{ (dimming_step | default(25) / 255 * 100) | round(1) }}"
+                            brightness: "{{ next_brightness }}"
                             transition: "{{ (dimming_interval | default(200)) / 1000 }}"
                         - delay:
                             milliseconds: !input dimming_interval
@@ -233,18 +240,13 @@ action:
                       sequence:
                         - variables:
                             current_brightness: "{{ state_attr(target_light, 'brightness') | int(255) }}"
-                            # Use smaller steps when near minimum
-                            step_pct: >
-                              {% if current_brightness <= 16 %}
-                                {{ ((current_brightness - 1) / 255 * 100) | abs }}
-                              {% else %}
-                                {{ (dimming_step | default(25) / 255 * 100) | round(1) }}
-                              {% endif %}
+                            step_val: "{{ dimming_step | int(25) }}"
+                            next_brightness: "{{ [ current_brightness - step_val, 1 ] | max }}"
                         - service: light.turn_on
                           target:
                             entity_id: !input target_light
                           data:
-                            brightness_step_pct: "{{ -step_pct }}"
+                            brightness: "{{ next_brightness }}"
                             transition: "{{ (dimming_interval | default(200)) / 1000 }}"
                         - delay:
                             milliseconds: !input dimming_interval

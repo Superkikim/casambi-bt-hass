@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Toggle and Dim
-  description: Short press to toggle light, hold to dim (combines toggle and dimming functionality) - v1.2.2
+  description: Short press to toggle light, hold to dim (combines toggle and dimming functionality). Robust to out-of-order/missing press events - v1.3.0
   domain: automation
   input:
     unit_id:
@@ -115,11 +115,12 @@ action:
       is_release_event: "{{ event_action in ['button_release', 'button_release_after_hold'] }}"
       
   - choose:
-      # Handle button press - just track state
+      # Handle button press - ignore while holding to prevent breaking dim loop
       - conditions:
           - condition: template
-            value_template: "{{ event_action == 'button_press' }}"
+            value_template: "{{ event_action == 'button_press' and not is_holding }}"
         sequence:
+          # Optional: track a press, but do not rely on it for logic
           - service: input_text.set_value
             target:
               entity_id: !input button_state_helper

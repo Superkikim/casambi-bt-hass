@@ -50,27 +50,80 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Event deduplication cache: (unit_id, button, action) -> timestamp
     event_cache: dict[tuple[int, int, str], float] = {}
 
-    # Get deduplication window from config or use default
-    dedup_window = entry.options.get("switch_event_dedup_window", 0.6)  # Default 600ms
+    # Reordering state (per connection/session)
+    # Buffer: device_sequence (uint32) -> list of pending event dicts (packet order)
+    reorder_buffer: dict[int, list[dict]] = {}
+    # Next expected device_sequence (uint32) or None until initialized
+    next_seq: int | None = None
+    # Timer task handle for gap skipping
+    reorder_task: asyncio.Task | None = None
 
-    _LOGGER.info("Switch event deduplication enabled with %.1fs window", dedup_window)
+    # Configurable small delay (seconds) before skipping over a missing seq
+    reorder_delay = float(entry.options.get("switch_event_reorder_delay", 0.08))
 
-    # Register switch event handler that fires Home Assistant events
-    def handle_switch_event(event_data: dict) -> None:
-        """Fire a Home Assistant event when a switch is pressed/released."""
+    def _serial_less(a: int, b: int) -> bool:
+        """Return True if a < b in RFC1982 32-bit serial arithmetic."""
+        return ((b - a) & 0xFFFFFFFF) < 0x80000000
+
+    def _serial_eq(a: int, b: int) -> bool:
+        return (a ^ b) & 0xFFFFFFFF == 0
+
+    def _min_serial_after(base: int, keys: list[int]) -> int | None:
+        """Return the smallest serial >= base among keys under serial ordering."""
+        if not keys:
+            return None
+        # Choose k that minimizes (k - base) in modulo 2^32 space
+        best = None
+        best_delta = None
+        for k in keys:
+            delta = (k - base) & 0xFFFFFFFF
+            if best_delta is None or delta < best_delta:
+                best = k
+                best_delta = delta
+        return best
+
+    async def _reorder_flush_task():
+        nonlocal next_seq, reorder_task
+        await asyncio.sleep(reorder_delay)
+        try:
+            if next_seq is None:
+                return
+            if next_seq not in reorder_buffer and reorder_buffer:
+                # Skip to the smallest available seq and continue
+                new_next = _min_serial_after(next_seq, list(reorder_buffer.keys()))
+                if new_next is not None and not _serial_eq(new_next, next_seq):
+                    _LOGGER.debug(
+                        "Reorder: gap on %s; skipping to next available %s",
+                        next_seq,
+                        new_next,
+                    )
+                    next_seq = new_next
+            # Attempt to flush contiguous sequences
+            _flush_ready()
+        finally:
+            reorder_task = None
+
+    def _schedule_reorder_flush():
+        nonlocal reorder_task
+        if reorder_task is None:
+            reorder_task = hass.loop.create_task(_reorder_flush_task())
+
+    def _emit_ordered(event: dict) -> None:
+        """Emit one event to HA with existing dedup logic."""
         # Convert any bytes objects to hex strings for JSON serialization
-        raw_packet = event_data.get("raw_packet")
-        decrypted_data = event_data.get("decrypted_data")
-        payload_hex = event_data.get("payload_hex")
-        extra_data = event_data.get("extra_data")
+        raw_packet = event.get("raw_packet")
+        decrypted_data = event.get("decrypted_data")
+        payload_hex = event.get("payload_hex")
+        extra_data = event.get("extra_data")
 
-        # Convert payload_hex to string if it's bytes
-        payload_hex_str = payload_hex.hex() if isinstance(payload_hex, bytes) else payload_hex
+        payload_hex_str = payload_hex if isinstance(payload_hex, str) else (
+            payload_hex.hex() if isinstance(payload_hex, bytes) else payload_hex
+        )
 
-        # Check for duplicate events
-        unit_id = event_data.get("unit_id")
-        button = event_data.get("button")
-        action = event_data.get("event")  # button_press, button_release, etc.
+        # Dedup logic
+        unit_id = event.get("unit_id")
+        button = event.get("button")
+        action = event.get("event")
 
         if unit_id is not None and button is not None and action:
             cache_key = (unit_id, button, action)
@@ -98,28 +151,67 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             f"{DOMAIN}_switch_event",
             {
                 "entry_id": entry.entry_id,
-                "unit_id": event_data.get("unit_id"),
-                "button": event_data.get("button"),
-                "action": event_data.get("event"),  # "button_press", "button_hold", "button_release", or "button_release_after_hold"
-                "message_type": event_data.get("message_type"),
-                "flags": event_data.get("flags"),
-                "packet_sequence": event_data.get("packet_sequence"),
-                "raw_packet": raw_packet.hex() if isinstance(raw_packet, bytes) else raw_packet,
-                "decrypted_data": decrypted_data.hex() if isinstance(decrypted_data, bytes) else decrypted_data,
-                "message_position": event_data.get("message_position"),
+                "unit_id": unit_id,
+                "button": event.get("button"),
+                "action": action,
+                "message_type": event.get("message_type"),
+                "flags": event.get("flags"),
+                "packet_sequence": event.get("packet_sequence"),
+                "arrival_sequence": event.get("arrival_sequence"),
+                "raw_packet": raw_packet,
+                "decrypted_data": decrypted_data,
+                "message_position": event.get("message_position"),
                 "payload_hex": payload_hex_str,
-                "extra_data": extra_data.hex() if isinstance(extra_data, bytes) else None,
+                "extra_data": extra_data.hex() if isinstance(extra_data, bytes) else extra_data,
             }
         )
-        _LOGGER.debug(
-            "Fired %s_switch_event for unit %s button %s - %s (seq: %s, raw: %s)",
-            DOMAIN,
-            event_data.get('unit_id'),
-            event_data.get('button'),
-            event_data.get('event'),
-            event_data.get('packet_sequence'),
-            (raw_packet.hex()[:20] + '...') if raw_packet else 'None'
-        )
+
+    def _flush_ready() -> None:
+        nonlocal next_seq
+        if next_seq is None:
+            return
+        # Flush contiguous sequences starting at next_seq
+        while next_seq in reorder_buffer:
+            events = reorder_buffer.pop(next_seq)
+            for e in events:
+                _emit_ordered(e)
+            next_seq = (next_seq + 1) & 0xFFFFFFFF
+
+    # Get deduplication window from config or use default
+    dedup_window = entry.options.get("switch_event_dedup_window", 0.6)  # Default 600ms
+
+    _LOGGER.info("Switch event deduplication enabled with %.1fs window", dedup_window)
+
+    # Register switch event handler that fires Home Assistant events
+    def handle_switch_event(event_data: dict) -> None:
+        """Buffer and emit switch events in true sequence order with dedup."""
+        nonlocal next_seq
+
+        seq = event_data.get("packet_sequence")
+        # If no device sequence, emit immediately (fallback)
+        if not isinstance(seq, int):
+            _emit_ordered(event_data)
+            return
+
+        # Detect large backward jump => likely session reset; clear buffer
+        if next_seq is not None and _serial_less(seq, next_seq) and ((next_seq - seq) & 0xFFFFFFFF) >= 0x80000000:
+            _LOGGER.debug("Reorder: session reset detected (seq jump %s -> %s). Clearing buffer.", next_seq, seq)
+            reorder_buffer.clear()
+            next_seq = None
+
+        if next_seq is None:
+            next_seq = seq
+
+        # Buffer the event by sequence
+        bucket = reorder_buffer.setdefault(seq, [])
+        bucket.append(event_data)
+
+        # Try flush contiguous sequences
+        _flush_ready()
+
+        # If still missing the next_seq, schedule a short timeout to skip gaps
+        if next_seq not in reorder_buffer:
+            _schedule_reorder_flush()
 
     # Register the event handler if the library supports it
     if hasattr(api.casa, 'registerSwitchEventHandler'):

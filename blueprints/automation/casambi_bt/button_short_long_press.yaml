@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Actions
-  description: Versatile button automation with customizable actions for different button events - v1.1.0
+  description: Versatile button automation with customizable actions for different button events. Robust to out-of-order/missing press events - v1.1.1
   domain: automation
   input:
     unit_id:
@@ -128,10 +128,14 @@ condition:
 
 action:
   - choose:
-      # Button Press
+      # Button Press (ignored while holding)
       - conditions:
           - condition: template
-            value_template: "{{ trigger.event.data.action == 'button_press' }}"
+            value_template: >
+              {{ trigger.event.data.action == 'button_press' and (
+                   button_state_helper == '' or 
+                   (states(button_state_helper) not in ['holding', 'continuous_hold'])
+              ) }}
         sequence:
           - choose:
               - conditions:

@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Cover Control
-  description: Control blinds/covers - short press to open/close/stop, hold to open/close continuously - v1.2.0
+  description: Control blinds/covers - short press to open/close/stop, hold to open/close continuously. Robust to out-of-order/missing press events - v1.2.1
   domain: automation
   input:
     unit_id:
@@ -81,10 +81,10 @@ action:
       current_position: "{{ state_attr(target_cover, 'current_position') | int(50) }}"
       
   - choose:
-      # Handle button press - just track state
+      # Handle button press - ignore while holding
       - conditions:
           - condition: template
-            value_template: "{{ event_action == 'button_press' }}"
+            value_template: "{{ event_action == 'button_press' and not is_holding }}"
         sequence:
           - service: input_text.set_value
             target:

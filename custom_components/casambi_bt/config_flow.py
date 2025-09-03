@@ -33,9 +33,7 @@ OPTIONS_SCHEMA = vol.Schema(
         vol.Optional("switch_event_dedup_window", default=0.6): vol.All(
             vol.Coerce(float), vol.Range(min=0.0, max=5.0)
         ),
-        vol.Optional("switch_event_reorder_delay", default=0.08): vol.All(
-            vol.Coerce(float), vol.Range(min=0.0, max=1.0)
-        ),
+        vol.Optional("switch_event_dedup_disable", default=False): cv.boolean,
     }
 )
 

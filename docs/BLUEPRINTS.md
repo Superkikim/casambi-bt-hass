@@ -62,7 +62,7 @@ All blueprints include:
 - **Unit ID input**: Your switch's unit ID (see [how to find it](SWITCH_EVENTS.md#finding-your-switch-configuration))
 - **Button number**: Button number (1-4, matching the Casambi app)
 - **Message type filtering**: Optional, leave empty to accept any type
-- **Debounce time**: Prevents duplicate triggers
+- **No time-window dedup**: relies on protocol-level suppression; helper-state prevents multiple hold loops
 
 ## Example Automations
 

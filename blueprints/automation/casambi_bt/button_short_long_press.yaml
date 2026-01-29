@@ -83,18 +83,6 @@ blueprint:
           max: 1000
           step: 50
           unit_of_measurement: ms
-    
-    # Debounce
-    debounce_time:
-      name: Debounce Time
-      description: Minimum seconds between automation triggers
-      default: 0.5
-      selector:
-        number:
-          min: 0
-          max: 5
-          step: 0.1
-          unit_of_measurement: seconds
 
 mode: parallel
 max: 3
@@ -104,7 +92,6 @@ variables:
   button_state_helper: !input button_state_helper
   hold_action: !input hold_action
   hold_repeat_interval: !input hold_repeat_interval
-  debounce_time: !input debounce_time
 
 trigger:
   - platform: event
@@ -120,11 +107,9 @@ condition:
       {% set event_message_type = trigger.event.data.message_type | string %}
       {% set event_action = trigger.event.data.action %}
       {% set message_match = (message_type_filter == '') or (message_type_filter == event_message_type) %}
-      {% set debounce = debounce_time | default(0.5) %}
-      {% set last_triggered = as_timestamp(state_attr(this.entity_id, 'last_triggered') | default(0)) %}
-      {% set time_passed = as_timestamp(now()) - last_triggered %}
       
-      {{ message_match and time_passed > debounce }}
+      {# Accept all relevant button events #}
+      {{ message_match and event_action in ['button_press', 'button_release', 'button_hold', 'button_release_after_hold'] }}
 
 action:
   - choose:
@@ -183,7 +168,11 @@ action:
       # Long Press Started (Hold)
       - conditions:
           - condition: template
-            value_template: "{{ trigger.event.data.action == 'button_hold' }}"
+            value_template: >
+              {{ trigger.event.data.action == 'button_hold' and (
+                   button_state_helper == '' or
+                   (states(button_state_helper) not in ['holding', 'continuous_hold'])
+              ) }}
         sequence:
           # Update helper
           - choose:

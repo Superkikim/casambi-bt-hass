@@ -142,9 +142,7 @@ action:
       # Handle button hold - start opening or closing
       - conditions:
           - condition: template
-            value_template: >
-              {# Guard against out-of-order/late hold frames by requiring a preceding press #}
-              {{ trigger.event.data.action == 'button_hold' and states(button_state_helper) == 'pressed' }}
+            value_template: "{{ trigger.event.data.action == 'button_hold' }}"
         sequence:
           # Set state to holding
           - service: input_text.set_value

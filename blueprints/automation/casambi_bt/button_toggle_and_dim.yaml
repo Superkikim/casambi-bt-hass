@@ -157,7 +157,9 @@ action:
       # Handle button hold - update helper and start dimming loop
       - conditions:
           - condition: template
-            value_template: "{{ trigger.event.data.action == 'button_hold' }}"
+            value_template: >
+              {# Guard against out-of-order/late hold frames by requiring a preceding press #}
+              {{ trigger.event.data.action == 'button_hold' and states(button_state_helper) == 'pressed' }}
         sequence:
           # Update button state to holding
           - service: input_text.set_value

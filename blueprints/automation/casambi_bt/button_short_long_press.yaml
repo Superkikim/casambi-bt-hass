@@ -171,7 +171,7 @@ action:
             value_template: >
               {{ trigger.event.data.action == 'button_hold' and (
                    button_state_helper == '' or
-                   (states(button_state_helper) not in ['holding', 'continuous_hold'])
+                   (states(button_state_helper) == 'pressed')
               ) }}
         sequence:
           # Update helper

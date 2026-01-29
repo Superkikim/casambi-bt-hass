@@ -28,15 +28,6 @@ from .const import CONF_IMPORT_GROUPS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-OPTIONS_SCHEMA = vol.Schema(
-    {
-        vol.Optional("switch_event_dedup_window", default=0.6): vol.All(
-            vol.Coerce(float), vol.Range(min=0.0, max=5.0)
-        ),
-        vol.Optional("switch_event_dedup_disable", default=False): cv.boolean,
-    }
-)
-
 USER_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_ADDRESS): cv.string,
@@ -84,11 +75,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     discovery_info: BluetoothServiceInfoBleak | None = None
 
     VERSION = 1
-
-    @staticmethod
-    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> config_entries.OptionsFlow:
-        """Get the options flow for this handler."""
-        return OptionsFlow(config_entry)
 
     async def _async_create_casa_entry(
         self, title: str, id: str, data: dict[str, Any]
@@ -231,28 +217,4 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 REAUTH_SCHEMA, self.entry.data
             ),
             errors=errors,
-        )
-
-
-class OptionsFlow(config_entries.OptionsFlow):
-    """Handle options flow for Casambi Bluetooth integration."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        # `config_entry` is exposed as a read-only @property on HA's OptionsFlow.
-        # We must set the underlying private attribute.
-        self._config_entry = config_entry
-
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Manage the options."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
-
-        return self.async_show_form(
-            step_id="init",
-            data_schema=self.add_suggested_values_to_schema(
-                OPTIONS_SCHEMA, self.config_entry.options
-            ),
         )

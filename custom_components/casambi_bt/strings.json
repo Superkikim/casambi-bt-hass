@@ -29,20 +29,5 @@
       "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
       "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]"
     }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Casambi Bluetooth Options",
-        "data": {
-          "switch_event_dedup_window": "Switch event deduplication window (seconds)",
-          "switch_event_dedup_disable": "Disable switch event deduplication"
-        },
-        "data_description": {
-          "switch_event_dedup_window": "Time window to filter duplicate switch events (usually unnecessary with the current protocol parser). Default: 0.6 seconds (600ms).",
-          "switch_event_dedup_disable": "Turn off deduplication entirely (recommended if you are not seeing duplicates)."
-        }
-      }
-    }
   }
 }

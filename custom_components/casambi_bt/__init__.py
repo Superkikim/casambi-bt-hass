@@ -8,7 +8,6 @@ import contextlib
 import json
 import logging
 from pathlib import Path
-import time
 from typing import Final
 import yaml
 
@@ -47,15 +46,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api = CasambiApi(hass, entry, entry.data[CONF_ADDRESS], entry.data[CONF_PASSWORD])
     await api.connect()
 
-    # Event deduplication cache:
-    # - new parser: (event_id,) -> timestamp
-    # - legacy parser: (unit_id, button, action) -> timestamp
-    event_cache: dict[tuple[object, ...], float] = {}
-
-    # No reorder buffering; events emit as delivered by the library
-
-    def _emit_ordered(event: dict) -> None:
-        """Emit one event to HA with existing dedup logic."""
+    # No buffering/dedup here; emit exactly what the library delivers.
+    def _emit_event(event: dict) -> None:
+        """Emit one event to HA."""
         # Convert any bytes objects to hex strings for JSON serialization
         raw_packet = event.get("raw_packet")
         decrypted_data = event.get("decrypted_data")
@@ -88,31 +81,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         button_event_index = event.get("button_event_index")
         param_p = event.get("param_p")
         param_s = event.get("param_s")
-
-        # Dedup logic (optional)
-        if not dedup_disabled and dedup_window > 0.0:
-            if unit_id is not None and button is not None and action:
-                # Prefer a stable event id (origin/age/opcode/target) when provided by the library.
-                cache_key = (event_id,) if event_id else (unit_id, button, action)
-                current_time = time.time()
-
-                # Clean up old entries from cache
-                for key in list(event_cache.keys()):
-                    if current_time - event_cache[key] > dedup_window:
-                        del event_cache[key]
-
-                # Check if this event was seen recently
-                if cache_key in event_cache:
-                    time_diff = current_time - event_cache[cache_key]
-                    if time_diff < dedup_window:
-                        _LOGGER.debug(
-                            "Skipping duplicate event: unit=%s, button=%s, action=%s (last seen %.3fs ago)",
-                            unit_id, button, action, time_diff
-                        )
-                        return
-
-                # Record this event
-                event_cache[cache_key] = current_time
 
         hass.bus.async_fire(
             f"{DOMAIN}_switch_event",
@@ -148,21 +116,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             }
         )
 
-    # No semantic buffering; keep original arrival order
-
-    # Get deduplication settings from options
-    dedup_window = float(entry.options.get("switch_event_dedup_window", 0.6))
-    dedup_disabled = bool(entry.options.get("switch_event_dedup_disable", False))
-
-    if dedup_disabled or dedup_window <= 0.0:
-        _LOGGER.info("Switch event deduplication disabled")
-    else:
-        _LOGGER.info("Switch event deduplication enabled with %.1fs window", dedup_window)
-
     # Register switch event handler that fires Home Assistant events
     def handle_switch_event(event_data: dict) -> None:
-        """Immediately emit switch events from the library (with dedup)."""
-        _emit_ordered(event_data)
+        """Immediately emit switch events from the library."""
+        _emit_event(event_data)
 
     # Register the event handler if the library supports it
     if hasattr(api.casa, 'registerSwitchEventHandler'):

@@ -34,7 +34,7 @@ The underlying library decodes switch events from decrypted Casambi packet type 
   - a NotifyInput stream (`target_type=0x12`) for hold/release-after-hold
 - Wired switches often only send NotifyInput (`target_type=0x12`). In that case the library maps `input_code` to semantic actions (`button_press`, `button_release`, etc).
 
-The library suppresses same-state retransmits at the protocol layer, so Home Assistant-style time-window deduplication is usually unnecessary.
+The library suppresses same-state retransmits at the protocol layer, so Home Assistant-style time-window deduplication is unnecessary.
 
 For the field layout and parsing logic (ground-truthed against the official Android app), see `casambi-bt/doc/PROTOCOL_PARSING.md`.
 
@@ -71,9 +71,6 @@ If you see multiple events with different `unit_id` values, verify the correct o
 6. Use this Unit ID in your automations
 
 **Button Numbers**: Button numbers in events match the Casambi app (1-4). Always test each physical button first to verify which button number it generates.
-
-### Event Deduplication
-The integration includes an optional time-window deduplication setting for extra safety, but the current protocol parser already suppresses same-state retransmits.
 
 ### Event Reliability
 Bluetooth is still best-effort, but the Casambi protocol itself includes retransmits and the parser handles duplicates/missed edges significantly better than naive advertisement listening.

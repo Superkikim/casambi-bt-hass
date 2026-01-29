@@ -170,3 +170,5 @@ poetry.toml
 
 # End of https://www.toptal.com/developers/gitignore/api/python
 
+# Local release artifacts
+casambi_bt_hass_v*.zip

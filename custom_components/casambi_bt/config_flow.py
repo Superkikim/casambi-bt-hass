@@ -239,9 +239,9 @@ class OptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        # Home Assistant's OptionsFlow does not define an __init__ that accepts
-        # the config entry, so we store it ourselves.
-        self.config_entry = config_entry
+        # `config_entry` is exposed as a read-only @property on HA's OptionsFlow.
+        # We must set the underlying private attribute.
+        self._config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

@@ -34,7 +34,7 @@ The underlying library decodes switch events from decrypted Casambi packet type 
   - a NotifyInput stream (`target_type=0x12`) for hold/release-after-hold
 - Wired switches often only send NotifyInput (`target_type=0x12`). In that case the library maps `input_code` to semantic actions (`button_press`, `button_release`, etc).
 
-The library suppresses same-state retransmits at the protocol layer, so Home Assistant-style time-window deduplication is unnecessary.
+The library suppresses same-state retransmits at the protocol layer, so Home Assistant-style time-window deduplication is unnecessary (and this integration does not apply any additional time-window filtering).
 
 For the field layout and parsing logic (ground-truthed against the official Android app), see `casambi-bt/doc/PROTOCOL_PARSING.md`.
 

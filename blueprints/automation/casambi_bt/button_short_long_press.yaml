@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Actions
-  description: Versatile button automation with customizable actions for different button events. Robust to out-of-order/missing press events - v1.1.1
+  description: Versatile button automation with customizable actions for different button events.
   domain: automation
   input:
     unit_id:
@@ -11,8 +11,8 @@ blueprint:
           mode: box
     button:
       name: Button Number
-      description: Button number (0-based)
-      default: 0
+      description: Button number (1-4, matching Casambi app)
+      default: 1
       selector:
         number:
           mode: box
@@ -34,7 +34,7 @@ blueprint:
     # Short Press Action (Press and Release)
     short_press_action:
       name: Short Press Action (Optional)
-      description: Action on quick press and release (< 500ms)
+      description: Action on press followed by a normal release (no hold)
       default: []
       selector:
         action: {}
@@ -42,7 +42,7 @@ blueprint:
     # Long Press Started Action
     long_press_started_action:
       name: Long Press Started Action (Optional)
-      description: Action when button hold is detected (after ~500ms)
+      description: Action when a hold event is received (button_hold)
       default: []
       selector:
         action: {}

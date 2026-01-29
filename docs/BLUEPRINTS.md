@@ -16,8 +16,8 @@ This integration includes several automation blueprints to make it easy to set u
 
 Available actions:
 - **Button Press**: When button is initially pressed
-- **Short Press**: Quick press and release (< 500ms)
-- **Long Press Started**: When hold is detected (~500ms)
+- **Short Press**: Press followed by a normal release (no hold)
+- **Long Press Started**: When a hold event is received (`button_hold`)
 - **Long Press Released**: When button is released after hold
 - **Continuous Hold**: Repeating action while held (requires helper)
 
@@ -54,13 +54,13 @@ If the import buttons don't work or you prefer manual installation:
 ### Helper Setup for Dimming/Cover Control
 For blueprints that support continuous actions (Toggle and Dim, Cover Control), you need to create an input_text helper:
 1. Go to Settings → Devices & Services → Helpers → Create Helper → Text
-2. Name it something like "casambi_button_123_0_state" (for unit 123, button 0)
+2. Name it something like "casambi_button_123_1_state" (for unit 123, button 1)
 3. Use this helper in the blueprint configuration when setting up the automation
 
 ### Common Blueprint Features
 All blueprints include:
 - **Unit ID input**: Your switch's unit ID (see [how to find it](SWITCH_EVENTS.md#finding-your-switch-configuration))
-- **Button number**: 0-based button index (test each button to find its number)
+- **Button number**: Button number (1-4, matching the Casambi app)
 - **Message type filtering**: Optional, leave empty to accept any type
 - **Debounce time**: Prevents duplicate triggers
 
@@ -76,7 +76,7 @@ automation:
         event_type: casambi_bt_switch_event
         event_data:
           unit_id: 123  # Your switch unit ID
-          button: 0     # Button number (0-based)
+          button: 1     # Button number (1-4, matching Casambi app)
           action: button_press
     condition:
       # Prevent re-triggering within 2 seconds
@@ -102,7 +102,7 @@ automation:
         event_type: casambi_bt_switch_event
         event_data:
           unit_id: 123  # Your switch unit ID
-          button: 0     # Button number (0-based)
+          button: 1     # Button number (1-4, matching Casambi app)
     condition:
       - condition: template
         value_template: >
@@ -156,7 +156,7 @@ automation:
         event_type: casambi_bt_switch_event
         event_data:
           unit_id: 123
-          button: 0
+          button: 1
           action: button_release  # Only triggered on quick press/release
     action:
       - service: light.toggle
@@ -168,7 +168,7 @@ automation:
         event_type: casambi_bt_switch_event
         event_data:
           unit_id: 123
-          button: 0
+          button: 1
           action: button_release_after_hold  # Only triggered after holding
     action:
       - service: scene.turn_on
@@ -186,13 +186,13 @@ automation:
         event_type: casambi_bt_switch_event
         event_data:
           unit_id: 123
-          button: 0
+          button: 1
           action: button_press
       - platform: event
         event_type: casambi_bt_switch_event
         event_data:
           unit_id: 123
-          button: 0
+          button: 1
           action: button_release
     condition:
       # Prevent double triggers and ignore release after hold

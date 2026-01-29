@@ -9,20 +9,34 @@ Switch button press/release events are fired as Home Assistant events that can b
   - `unit_id`: The Casambi unit ID that sent the event
   - `button`: Button number (1-4, matching Casambi app)
   - `action`: Event type - one of:
-    - `"button_press"` - Initial button press
-    - `"button_hold"` - Sent continuously while button is held down
-    - `"button_release"` - Quick press and release
-    - `"button_release_after_hold"` - Release after holding
-  - `message_type`: Raw message type from the device
-  - `flags`: Additional flags from the message
+    - `"button_press"`
+    - `"button_hold"` (repeats while held, device/firmware dependent)
+    - `"button_release"`
+    - `"button_release_after_hold"`
+    - `"input_event"` (raw NotifyInput frame; useful for diagnostics and some wired devices)
+  - `message_type`: Decrypted packet type (always `7` for switch events)
+  - `flags`: INVOCATION flags (uint16)
+  - INVOCATION metadata:
+    - `event_id`: Stable correlation id: `invoke:{origin}:{age}:{opcode}:{target}`
+    - `opcode`, `target_type`, `origin`, `age`
+    - `button_event_index`, `param_p`, `param_s` (for the button stream)
+  - NotifyInput fields (only for `target_type == 18 / 0x12`):
+    - `input_index`, `input_code`, `input_channel`, `input_value16`, `input_mapped_event`
+  - Diagnostics:
+    - `packet_sequence`, `arrival_sequence`, `raw_packet`, `decrypted_data`, `payload_hex`, `message_position`
 
-## Button Hold Timing
-- **Press to Hold Delay**: Approximately 500-600ms
-  - Short press (< 500ms): Fires `button_press` followed by `button_release`
-  - Long press (> 500ms): Fires `button_press`, then `button_hold` events start after ~500ms, finally `button_release_after_hold` when released
-- **Hold Event Frequency**: `button_hold` events repeat while the button is held
-  - The Casambi protocol sends multiple hold events with incrementing counters
-  - These events can be used for continuous actions like dimming
+## Wired vs Wireless Switches
+
+The underlying library decodes switch events from decrypted Casambi packet type `0x07` (INVOCATION stream), matching the official Android app parsing.
+
+- Wireless (battery) switches typically send:
+  - a "button stream" (`target_type=0x06`) for press/release
+  - a NotifyInput stream (`target_type=0x12`) for hold/release-after-hold
+- Wired switches often only send NotifyInput (`target_type=0x12`). In that case the library maps `input_code` to semantic actions (`button_press`, `button_release`, etc).
+
+The library suppresses same-state retransmits at the protocol layer, so Home Assistant-style time-window deduplication is usually unnecessary.
+
+For the field layout and parsing logic (ground-truthed against the official Android app), see `casambi-bt/doc/PROTOCOL_PARSING.md`.
 
 ## Listening to Events
 You can monitor these events in Developer Tools → Events → Listen to events by entering `casambi_bt_switch_event` as the event type.
@@ -43,7 +57,7 @@ You can monitor these events in Developer Tools → Events → Listen to events 
 4. Press the physical button on your switch
 5. Check the captured event data for:
    - `unit_id`: The switch's unit ID
-   - `button`: The button number (0-based)
+   - `button`: The button number (1-4, matching the Casambi app)
    - `action`: The event type (button_press, button_release, etc.)
 
 
@@ -56,16 +70,13 @@ If you see multiple events with different `unit_id` values, verify the correct o
 5. Note the **Unit ID** shown
 6. Use this Unit ID in your automations
 
-**Button Numbers**: Button numbers in events match the Casambi app (1-4). Always test each physical button first to verify which button number it generates in the events.
+**Button Numbers**: Button numbers in events match the Casambi app (1-4). Always test each physical button first to verify which button number it generates.
 
 ### Event Deduplication
-The integration includes built-in event deduplication to prevent duplicate triggers. You can configure the deduplication window in the integration options (default: 600ms). This eliminates the need for complex debouncing logic in your automations.
+The integration includes an optional time-window deduplication setting for extra safety, but the current protocol parser already suppresses same-state retransmits.
 
 ### Event Reliability
-Button press and release events are **not guaranteed** to be captured due to the nature of Bluetooth communication:
-- Sometimes `button_press` events may be missed entirely
-- For better reliability, consider triggering automations on both `button_press` and `button_release` events
-- Be aware that `button_release` fires for short presses while `button_release_after_hold` fires for long presses - they are distinct events
+Bluetooth is still best-effort, but the Casambi protocol itself includes retransmits and the parser handles duplicates/missed edges significantly better than naive advertisement listening.
 
 ## Example Event Data
 Here are examples of different switch events in Home Assistant:
@@ -77,9 +88,14 @@ data:
   entry_id: fc8461de92e186495147fdb327fddea9
   unit_id: 31
   button: 1
-  action: button_release
-  message_type: 8
-  flags: 3
+  action: button_press
+  message_type: 7
+  event_id: invoke:1f51:0007:1e:1f06
+  opcode: 30
+  target_type: 6
+  origin: 8017
+  age: 7
+  flags: 2051
 origin: LOCAL
 ```
 
@@ -91,8 +107,10 @@ data:
   unit_id: 31
   button: 1
   action: button_hold
-  message_type: 16
-  flags: 2
+  message_type: 7
+  target_type: 18
+  input_code: 9
+  input_mapped_event: button_hold
 origin: LOCAL
 ```
 
@@ -104,7 +122,9 @@ data:
   unit_id: 31
   button: 1
   action: button_release_after_hold
-  message_type: 16
-  flags: 2
+  message_type: 7
+  target_type: 18
+  input_code: 12
+  input_mapped_event: button_release_after_hold
 origin: LOCAL
 ```

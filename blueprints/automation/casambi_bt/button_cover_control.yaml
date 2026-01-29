@@ -1,6 +1,6 @@
 blueprint:
   name: Casambi Button Cover Control
-  description: Control blinds/covers - short press to open/close/stop, hold to open/close continuously. Robust to out-of-order/missing press events - v1.2.1
+  description: Control blinds/covers - short press to open/close/stop, hold to open/close continuously.
   domain: automation
   input:
     unit_id:
@@ -11,8 +11,8 @@ blueprint:
           mode: box
     button:
       name: Button Number
-      description: Button number (0-based)
-      default: 0
+      description: Button number (1-4, matching Casambi app)
+      default: 1
       selector:
         number:
           mode: box

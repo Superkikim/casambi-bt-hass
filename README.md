@@ -11,9 +11,9 @@ An enhanced fork of the [original Casambi Bluetooth integration](https://github.
 ## What's Enhanced
 
 - **Fixed relay status** - Properly reports the status of relay units
-- **Switch event support** - Physical switch button press, hold, and release events 
+- **Switch event support** - Physical switch button press/hold/release events (wired + wireless)
 - **Automation blueprints** - Ready-to-use blueprints for button automations
-- **Based on casambi-bt-revamped** - Uses an enhanced version of the underlying library
+- **Based on casambi-bt-revamped** - Uses an enhanced version of the underlying library (protocol-level INVOCATION parsing)
 
 ## Quick Start
 
@@ -38,7 +38,7 @@ An enhanced fork of the [original Casambi Bluetooth integration](https://github.
 ### 📱 Switch Button Events
 Physical switches fire events for automations:
 - Button press, hold, and release detection
-- ~500ms press-to-hold delay
+- Hold/release-after-hold are emitted when the device/firmware sends them (no timer-based synthesis)
 - Support for short/long press actions
 
 [**→ Detailed Switch Event Documentation**](docs/SWITCH_EVENTS.md)

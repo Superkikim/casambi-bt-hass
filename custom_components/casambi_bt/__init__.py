@@ -47,8 +47,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api = CasambiApi(hass, entry, entry.data[CONF_ADDRESS], entry.data[CONF_PASSWORD])
     await api.connect()
 
-    # Event deduplication cache: (unit_id, button, action) -> timestamp
-    event_cache: dict[tuple[int, int, str], float] = {}
+    # Event deduplication cache:
+    # - new parser: (event_id,) -> timestamp
+    # - legacy parser: (unit_id, button, action) -> timestamp
+    event_cache: dict[tuple[object, ...], float] = {}
 
     # No reorder buffering; events emit as delivered by the library
 
@@ -72,14 +74,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             payload_hex.decode("ascii") if isinstance(payload_hex, (bytes, bytearray)) else payload_hex
         )
 
+        unit_id = event.get("unit_id")
+        button = event.get("button")
+        action = event.get("event")
+        event_id = event.get("event_id")
+
+        # Optional INVOCATION metadata (new parser)
+        opcode = event.get("opcode")
+        target_type = event.get("target_type")
+        origin = event.get("origin")
+        age = event.get("age")
+        invocation_flags = event.get("invocation_flags", event.get("flags"))
+        button_event_index = event.get("button_event_index")
+        param_p = event.get("param_p")
+        param_s = event.get("param_s")
+
         # Dedup logic (optional)
         if not dedup_disabled and dedup_window > 0.0:
-            unit_id = event.get("unit_id")
-            button = event.get("button")
-            action = event.get("event")
-
             if unit_id is not None and button is not None and action:
-                cache_key = (unit_id, button, action)
+                # Prefer a stable event id (origin/age/opcode/target) when provided by the library.
+                cache_key = (event_id,) if event_id else (unit_id, button, action)
                 current_time = time.time()
 
                 # Clean up old entries from cache
@@ -105,10 +119,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             {
                 "entry_id": entry.entry_id,
                 "unit_id": unit_id,
-                "button": event.get("button"),
+                "button": button,
                 "action": action,
                 "message_type": event.get("message_type"),
-                "flags": event.get("flags"),
+                "flags": invocation_flags,
+                "event_id": event_id,
+                "opcode": opcode,
+                "target_type": target_type,
+                "origin": origin,
+                "age": age,
+                "button_event_index": button_event_index,
+                "param_p": param_p,
+                "param_s": param_s,
+                # NotifyInput fields (target_type=0x12), exposed by casambi-bt-revamped parser
+                "input_index": event.get("input_index"),
+                "input_code": event.get("input_code"),
+                "input_b1": event.get("input_b1"),
+                "input_channel": event.get("input_channel"),
+                "input_value16": event.get("input_value16"),
+                "input_mapped_event": event.get("input_mapped_event"),
                 "packet_sequence": event.get("packet_sequence"),
                 "arrival_sequence": event.get("arrival_sequence"),
                 "raw_packet": raw_packet_str,

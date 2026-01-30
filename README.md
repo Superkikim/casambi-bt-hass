@@ -14,6 +14,7 @@ An enhanced fork of the [original Casambi Bluetooth integration](https://github.
 - **Switch event support** - Physical switch button press/hold/release events (wired + wireless)
 - **Automation blueprints** - Ready-to-use blueprints for button automations
 - **Based on casambi-bt-revamped** - Uses an enhanced version of the underlying library (protocol-level INVOCATION parsing)
+- **Classic protocol (experimental)** - Basic support for Classic (legacy) Casambi firmware networks (unit control)
 
 ## Quick Start
 
@@ -60,6 +61,10 @@ Import ready-to-use blueprints with one click:
 - Scenes
 - Switches (as events, not entities)
 - Relays
+
+Classic (legacy) firmware notes:
+- Discovery includes both EVO (`FE4D`) and Classic (`CA5A`) advertisements.
+- Classic support is currently focused on **controlling units**; state updates may be limited depending on firmware.
 
 ## Network Setup
 

@@ -6,6 +6,11 @@
       "service_uuid": "0000fe4d-0000-1000-8000-00805f9b34fb",
       "manufacturer_id": 963,
       "connectable": true
+    },
+    {
+      "service_uuid": "0000ca5a-0000-1000-8000-00805f9b34fb",
+      "manufacturer_id": 963,
+      "connectable": true
     }
   ],
   "codeowners": ["@lkempf"],
@@ -14,6 +19,6 @@
   "documentation": "https://github.com/lkempf/casambi-bt-hass",
   "integration_type": "hub",
   "iot_class": "local_push",
-  "requirements": ["casambi-bt-revamped==0.3.12.dev2"],
-  "version": "1.7.4"
+  "requirements": ["casambi-bt-revamped==0.3.12.dev3"],
+  "version": "1.7.5"
 }

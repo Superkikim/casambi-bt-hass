@@ -1,6 +1,11 @@
 blueprint:
   name: Casambi Button Actions
-  description: Versatile button automation with customizable actions for different button events.
+  description: >-
+    Versatile button automation with customizable actions for different button events.
+    Note: a long press starts with a button_press event, then later a button_hold event.
+    If you configure BOTH "Button Press Action" and "Long Press Started Action", a long press will run both.
+    For exclusive short/long behavior (e.g. toggle on short press, dim on hold), prefer using "Short Press Action"
+    (button_release) for toggles and leave "Button Press Action" empty.
   domain: automation
   input:
     unit_id:

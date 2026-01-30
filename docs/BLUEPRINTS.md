@@ -21,6 +21,13 @@ Available actions:
 - **Long Press Released**: When button is released after hold
 - **Continuous Hold**: Repeating action while held (requires helper)
 
+Important note about long press:
+- Casambi firmware sends `button_press` first, and only later sends `button_hold` (while still held).
+- If you have *two separate* automations (or blueprint actions) that trigger on `button_press` and `button_hold`,
+  a long press will trigger both.
+- For "exclusive" behavior, put toggles/actions under **Short Press** (`button_release`) and keep **Button Press**
+  empty, or use the "Toggle and Dim" blueprint.
+
 ### 3. Casambi Button Cover Control
 **Smart blind/cover control** - Short press to open/close/stop, hold for continuous movement
 

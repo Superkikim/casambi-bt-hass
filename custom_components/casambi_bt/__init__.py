@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable, Iterable
 import contextlib
-import importlib.metadata as importlib_metadata
 import json
 import logging
 from pathlib import Path
@@ -33,18 +32,22 @@ _LOGGER: Final = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Casambi Bluetooth from a config entry."""
-    _LOGGER.debug("Connecting to %s with %s", CONF_ADDRESS, CONF_PASSWORD)
+    _LOGGER.debug(
+        "Setting up entry title=%s entry_id=%s unique_id=%s address=%s",
+        entry.title,
+        entry.entry_id,
+        entry.unique_id,
+        entry.data.get(CONF_ADDRESS),
+    )
 
     # Help testers verify the installed library build quickly.
     try:
-        lib_ver = importlib_metadata.version("casambi-bt-revamped")
-    except Exception:
-        lib_ver = "unknown"
-    try:
-        import CasambiBt as _casambi_pkg  # local import for path logging
+        import CasambiBt as _casambi_pkg  # local import for path logging + version
 
+        lib_ver = getattr(_casambi_pkg, "__version__", "unknown")
         lib_path = getattr(_casambi_pkg, "__file__", "unknown")
     except Exception:
+        lib_ver = "unknown"
         lib_path = "unknown"
     _LOGGER.info("Using casambi-bt-revamped=%s (%s)", lib_ver, lib_path)
 

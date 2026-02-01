@@ -362,6 +362,10 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             conn_hash8 = getattr(client, "_classicConnHash8", None)
             conn_hash8_prefix = conn_hash8.hex() if isinstance(conn_hash8, (bytes, bytearray)) else None
 
+            notify_uuids = getattr(client, "_classicNotifyCharUuids", None)
+            if isinstance(notify_uuids, set):
+                notify_uuids = sorted(str(u) for u in notify_uuids)
+
             diag = {
                 "entry_id": casa_api.conf_entry.entry_id,
                 "address": casa_api.address,
@@ -369,11 +373,20 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 "cloud_protocolVersion": getattr(network, "protocolVersion", None),
                 "protocolMode": protocol_mode_name,
                 "classic_header_mode": getattr(client, "_classicHeaderMode", None),
+                "classic_hash_source": getattr(client, "_classicHashSource", None),
                 "classic_data_uuid": getattr(client, "_dataCharUuid", None),
+                "classic_tx_uuid": getattr(client, "_classicTxCharUuid", None),
+                "classic_notify_uuids": notify_uuids,
                 "classic_conn_hash8_prefix": conn_hash8_prefix,
                 "classic_visitorKey_present": bool(getattr(network, "classicVisitorKey", lambda: None)()),
                 "classic_managerKey_present": bool(getattr(network, "classicManagerKey", lambda: None)()),
                 "cloud_session_is_manager": bool(getattr(network, "isManager", lambda: False)()),
+                "classic_rx_frames": getattr(client, "_classicRxFrames", None),
+                "classic_rx_verified": getattr(client, "_classicRxVerified", None),
+                "classic_rx_unverifiable": getattr(client, "_classicRxUnverifiable", None),
+                "classic_rx_parse_fail": getattr(client, "_classicRxParseFail", None),
+                "classic_rx_type6": getattr(client, "_classicRxType6", None),
+                "classic_rx_type7": getattr(client, "_classicRxType7", None),
                 "units": len(units),
                 "units_with_securityKey": units_with_security_key,
                 "keyStore_present": bool(
@@ -464,6 +477,12 @@ class CasambiApi:
 
             await self.casa.connect(device, self.password)
             self._first_disconnect = True
+            _LOGGER.info(
+                "[CASAMBI_HA_NETWORK] address=%s protocolVersion=%s is_classic=%s",
+                self.address,
+                self.protocol_version,
+                self.is_classic_network,
+            )
         except BluetoothError as err:
             raise ConfigEntryNotReady("Failed to use bluetooth") from err
         except NetworkNotFoundError as err:
@@ -488,6 +507,22 @@ class CasambiApi:
     def available(self) -> bool:
         """Return True if the controller is available."""
         return self.casa.connected
+
+    @property
+    def protocol_version(self) -> int | None:
+        """Return the cloud protocolVersion for the network if available."""
+        raw = getattr(self.casa, "rawNetworkData", None) or {}
+        pv = raw.get("network", {}).get("protocolVersion")
+        return pv if isinstance(pv, int) else None
+
+    @property
+    def is_classic_network(self) -> bool:
+        """Best-effort Classic detection for HA behavior.
+
+        Classic networks should remain controllable even if unit online status is unknown.
+        """
+        pv = self.protocol_version
+        return pv is not None and pv < 10
 
     def get_units(
         self, control_types: list[UnitControlType] | None = None

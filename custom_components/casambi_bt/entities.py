@@ -106,8 +106,9 @@ class CasambiNetworkGroup(CasambiNetworkEntity, metaclass=ABCMeta):
     @property
     def available(self) -> bool:
         """Return true if any of the units in the group is available."""
-        return super().available and any(
-            unit.online for unit in self._unit_map.values()
+        return super().available and (
+            self._api.is_classic_network
+            or any(unit.online for unit in self._unit_map.values())
         )
 
     @callback
@@ -173,7 +174,7 @@ class CasambiUnitEntity(CasambiEntity, metaclass=ABCMeta):
     def available(self) -> bool:
         """Return True if the unit is available."""
         unit = cast("CasambiUnit", self._obj)
-        return super().available and unit.online
+        return super().available and (unit.online or self._api.is_classic_network)
 
     @callback
     def _change_callback(self, unit: CasambiUnit) -> None:

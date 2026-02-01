@@ -329,6 +329,69 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         )
         _LOGGER.info("Registered apply_switch_config service")
 
+    # Register dump_classic_diagnostics service if not already registered
+    if not hass.services.has_service(DOMAIN, "dump_classic_diagnostics"):
+        async def handle_dump_classic_diagnostics(call: ServiceCall) -> None:
+            """Log Classic protocol diagnostics (safe for sharing)."""
+            entry_id = call.data.get("entry_id")
+
+            casa_api: CasambiApi | None = None
+            if entry_id:
+                casa_api = hass.data.get(DOMAIN, {}).get(entry_id)
+                if casa_api is None:
+                    raise ValueError(f"Entry id {entry_id} not found in hass.data[{DOMAIN!r}]")
+            else:
+                for _eid in hass.data.get(DOMAIN, {}):
+                    casa_api = hass.data[DOMAIN][_eid]
+                    break
+                if casa_api is None:
+                    raise ValueError("No Casambi connection available")
+
+            casa = casa_api.casa
+            client = getattr(casa, "_casaClient", None)
+            network = getattr(casa, "_casaNetwork", None)
+
+            units = getattr(casa, "units", []) or []
+            units_with_security_key = sum(
+                1 for u in units if getattr(u, "securityKey", None) is not None
+            )
+
+            protocol_mode = getattr(client, "protocolMode", None)
+            protocol_mode_name = getattr(protocol_mode, "name", None)
+
+            conn_hash8 = getattr(client, "_classicConnHash8", None)
+            conn_hash8_prefix = conn_hash8.hex() if isinstance(conn_hash8, (bytes, bytearray)) else None
+
+            diag = {
+                "entry_id": casa_api.conf_entry.entry_id,
+                "address": casa_api.address,
+                "connected": getattr(casa, "connected", False),
+                "cloud_protocolVersion": getattr(network, "protocolVersion", None),
+                "protocolMode": protocol_mode_name,
+                "classic_header_mode": getattr(client, "_classicHeaderMode", None),
+                "classic_data_uuid": getattr(client, "_dataCharUuid", None),
+                "classic_conn_hash8_prefix": conn_hash8_prefix,
+                "classic_visitorKey_present": bool(getattr(network, "classicVisitorKey", lambda: None)()),
+                "classic_managerKey_present": bool(getattr(network, "classicManagerKey", lambda: None)()),
+                "cloud_session_is_manager": bool(getattr(network, "isManager", lambda: False)()),
+                "units": len(units),
+                "units_with_securityKey": units_with_security_key,
+                "keyStore_present": bool(
+                    (getattr(casa, "rawNetworkData", None) or {})
+                    .get("network", {})
+                    .get("keyStore")
+                ),
+            }
+
+            _LOGGER.warning("[CASAMBI_CLASSIC_DIAGNOSTICS] %s", diag)
+
+        hass.services.async_register(
+            DOMAIN,
+            "dump_classic_diagnostics",
+            handle_dump_classic_diagnostics,
+        )
+        _LOGGER.info("Registered dump_classic_diagnostics service")
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""

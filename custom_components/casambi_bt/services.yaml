@@ -110,3 +110,15 @@ apply_switch_config:
           min: 0
           max: 255
           mode: box
+
+dump_classic_diagnostics:
+  name: Dump Classic Diagnostics
+  description: Log protocol/handshake details useful for Classic and mixed networks reverse engineering
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Optional entry_id to target if multiple Casambi networks are configured
+      required: false
+      example: 01KG8AXQ57WSXCQ0W07CGMM4JP
+      selector:
+        text:

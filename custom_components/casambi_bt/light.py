@@ -8,6 +8,7 @@ import logging
 from typing import Any, Final, cast
 
 from CasambiBt import ColorSource, Group, Unit, UnitControlType, UnitState, _operation
+from CasambiBt.errors import ProtocolError
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
@@ -223,19 +224,65 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
             set_state = True
 
         if set_state:
-            await self._api.casa.setUnitState(unit, state)
-        else:
-            await self._api.casa.turnOn(self._obj)
+            try:
+                await self._api.casa.setUnitState(unit, state)
+                return
+            except ProtocolError as err:
+                # Classic networks don't support EVO INVOCATION packets for SetState.
+                # Fall back to individual operations supported by Classic.
+                if not (self._api.is_classic_network or "Classic networks" in str(err)):
+                    raise
+
+            was_set = False
+            if ATTR_BRIGHTNESS in kwargs:
+                await self._api.casa.setLevel(unit, kwargs[ATTR_BRIGHTNESS])
+                was_set = True
+            if ATTR_RGB_COLOR in kwargs:
+                await self._api.casa.setColor(unit, kwargs[ATTR_RGB_COLOR])
+                was_set = True
+            elif ATTR_RGBW_COLOR in kwargs:
+                rgb, w = kwargs[ATTR_RGBW_COLOR][:3], kwargs[ATTR_RGBW_COLOR][3]
+                await self._api.casa.setColor(unit, rgb)
+                await self._api.casa.setWhite(unit, w)
+                was_set = True
+            if ATTR_COLOR_TEMP_KELVIN in kwargs:
+                await self._api.casa.setTemperature(
+                    unit, kwargs[ATTR_COLOR_TEMP_KELVIN]
+                )
+                was_set = True
+            if ATTR_XY_COLOR in kwargs:
+                await self._api.casa.setColorXY(unit, kwargs[ATTR_XY_COLOR])
+                was_set = True
+
+            if not was_set:
+                await self._api.casa.turnOn(self._obj)
+            elif ATTR_BRIGHTNESS not in kwargs:
+                # Ensure the unit actually turns on when setting non-dimmer attributes.
+                if self.brightness is not None:
+                    await self._api.casa.setLevel(unit, self.brightness)
+                else:
+                    await self._api.casa.turnOn(self._obj)
+            return
+
+        await self._api.casa.turnOn(self._obj)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the unit."""
-        # HACK: Try to get lights only supporting ONOFF to turn off.
-        # SetLevel doesn't seem to work for unknown reasons.
+        # HACK: Some ONOFF-only lights don't respond to SetLevel on EVO, so use SetState.
+        # Classic networks don't support INVOCATION (SetState), so use SetLevel directly.
         if self.color_mode == ColorMode.ONOFF:
-            unit = cast("Unit", self._obj)
-            await self._api.casa._send(  # noqa: SLF001
-                unit, bytes(unit.unitType.stateLength), _operation.OpCode.SetState
-            )
+            if self._api.is_classic_network:
+                await self._api.casa.setLevel(cast("Unit", self._obj), 0)
+            else:
+                unit = cast("Unit", self._obj)
+                try:
+                    await self._api.casa._send(  # noqa: SLF001
+                        unit, bytes(unit.unitType.stateLength), _operation.OpCode.SetState
+                    )
+                except ProtocolError as err:
+                    if "Classic networks" not in str(err):
+                        raise
+                    await self._api.casa.setLevel(unit, 0)
         else:
             await super().async_turn_off(**kwargs)
 

@@ -331,9 +331,18 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     # Register dump_classic_diagnostics service if not already registered
     if not hass.services.has_service(DOMAIN, "dump_classic_diagnostics"):
-        async def handle_dump_classic_diagnostics(call: ServiceCall) -> None:
-            """Log Classic protocol diagnostics (safe for sharing)."""
+        async def handle_dump_classic_diagnostics(call: ServiceCall) -> dict:
+            """Log Classic protocol diagnostics (safe for sharing).
+
+            Returns enhanced diagnostics including:
+            - Full connection state
+            - Last 20 TX packets with timestamps
+            - Last 20 RX packets with timestamps
+            - GATT subscription status
+            - Any errors encountered
+            """
             entry_id = call.data.get("entry_id")
+            include_packet_history = call.data.get("include_packets", True)
 
             casa_api: CasambiApi | None = None
             if entry_id:
@@ -360,11 +369,19 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             protocol_mode_name = getattr(protocol_mode, "name", None)
 
             conn_hash8 = getattr(client, "_classicConnHash8", None)
-            conn_hash8_prefix = conn_hash8.hex() if isinstance(conn_hash8, (bytes, bytearray)) else None
+            conn_hash8_hex = conn_hash8.hex() if isinstance(conn_hash8, (bytes, bytearray)) else None
 
             notify_uuids = getattr(client, "_classicNotifyCharUuids", None)
             if isinstance(notify_uuids, set):
                 notify_uuids = sorted(str(u) for u in notify_uuids)
+
+            # Get enhanced diagnostics from client if available
+            client_diag = {}
+            if client is not None and hasattr(client, "getClassicDiagnostics"):
+                try:
+                    client_diag = client.getClassicDiagnostics()
+                except Exception as e:
+                    client_diag = {"error": str(e)}
 
             diag = {
                 "entry_id": casa_api.conf_entry.entry_id,
@@ -377,16 +394,22 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 "classic_data_uuid": getattr(client, "_dataCharUuid", None),
                 "classic_tx_uuid": getattr(client, "_classicTxCharUuid", None),
                 "classic_notify_uuids": notify_uuids,
-                "classic_conn_hash8_prefix": conn_hash8_prefix,
+                "classic_conn_hash8_hex": conn_hash8_hex,
                 "classic_visitorKey_present": bool(getattr(network, "classicVisitorKey", lambda: None)()),
                 "classic_managerKey_present": bool(getattr(network, "classicManagerKey", lambda: None)()),
                 "cloud_session_is_manager": bool(getattr(network, "isManager", lambda: False)()),
-                "classic_rx_frames": getattr(client, "_classicRxFrames", None),
-                "classic_rx_verified": getattr(client, "_classicRxVerified", None),
-                "classic_rx_unverifiable": getattr(client, "_classicRxUnverifiable", None),
-                "classic_rx_parse_fail": getattr(client, "_classicRxParseFail", None),
-                "classic_rx_type6": getattr(client, "_classicRxType6", None),
-                "classic_rx_type7": getattr(client, "_classicRxType7", None),
+                "classic_rx_stats": {
+                    "frames": getattr(client, "_classicRxFrames", None),
+                    "verified": getattr(client, "_classicRxVerified", None),
+                    "unverifiable": getattr(client, "_classicRxUnverifiable", None),
+                    "parse_fail": getattr(client, "_classicRxParseFail", None),
+                    "type6_unitstate": getattr(client, "_classicRxType6", None),
+                    "type7_switch": getattr(client, "_classicRxType7", None),
+                    "type9_netconf": getattr(client, "_classicRxType9", None),
+                    "cmdstream": getattr(client, "_classicRxCmdStream", None),
+                    "unknown": getattr(client, "_classicRxUnknown", None),
+                },
+                "classic_first_rx_ts": getattr(client, "_classicFirstRxTs", None),
                 "units": len(units),
                 "units_with_securityKey": units_with_security_key,
                 "keyStore_present": bool(
@@ -396,12 +419,21 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 ),
             }
 
+            # Include packet history if requested
+            if include_packet_history:
+                diag["classic_tx_history"] = client_diag.get("classic_tx_history", [])
+                diag["classic_rx_history"] = client_diag.get("classic_rx_history", [])
+                diag["classic_tx_count"] = client_diag.get("classic_tx_count", 0)
+                diag["classic_rx_count"] = client_diag.get("classic_rx_count", 0)
+
             _LOGGER.warning("[CASAMBI_CLASSIC_DIAGNOSTICS] %s", diag)
+            return {"diagnostics": diag}
 
         hass.services.async_register(
             DOMAIN,
             "dump_classic_diagnostics",
             handle_dump_classic_diagnostics,
+            supports_response="optional",
         )
         _LOGGER.info("Registered dump_classic_diagnostics service")
 

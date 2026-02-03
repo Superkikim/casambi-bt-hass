@@ -19,6 +19,6 @@
   "documentation": "https://github.com/lkempf/casambi-bt-hass",
   "integration_type": "hub",
   "iot_class": "local_push",
-  "requirements": ["casambi-bt-revamped==0.3.12.dev11"],
-  "version": "1.7.5.dev9"
+  "requirements": ["casambi-bt-revamped==0.3.12.dev12"],
+  "version": "1.7.5.dev10"
 }

@@ -6,15 +6,15 @@ An enhanced fork of the [original Casambi Bluetooth integration](https://github.
 
 > ⚠️ **DEVELOPMENT WARNING**: This repository is used as a development environment. Things might break at any moment. It's recommended to wait at least 1 day after a new release before updating to ensure stability. All stable changes will be merged back to the original repository.
 > 
-> **When to use this fork**: Use this version if you need relay support (stable) or want to use Casambi switches in Home Assistant (usable but still being improved). Otherwise, stick with the original integration.
+> **When to use this fork**: Use this version if you need Classic firmware support, want to use Casambi switches in Home Assistant (usable but still being improved), or need relay support. Otherwise, stick with the original integration.
 
 ## What's Enhanced
 
-- **Fixed relay status** - Properly reports the status of relay units
+- **Classic protocol support** - Lighting fixtures on Classic (legacy) Casambi firmware networks: on/off, dimming, and live state sync from the Casambi app. More testers welcome!
 - **Switch event support** - Physical switch button press/hold/release events (wired + wireless)
 - **Automation blueprints** - Ready-to-use blueprints for button automations
+- **Fixed relay status** - Properly reports the status of relay units (also merged to the original integration)
 - **Based on casambi-bt-revamped** - Uses an enhanced version of the underlying library (protocol-level INVOCATION parsing)
-- **Classic protocol support** - Lighting fixtures on Classic (legacy) Casambi firmware networks: on/off, dimming, and live state sync from the Casambi app. More testers welcome!
 
 ## Quick Start
 

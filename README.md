@@ -14,7 +14,7 @@ An enhanced fork of the [original Casambi Bluetooth integration](https://github.
 - **Switch event support** - Physical switch button press/hold/release events (wired + wireless)
 - **Automation blueprints** - Ready-to-use blueprints for button automations
 - **Based on casambi-bt-revamped** - Uses an enhanced version of the underlying library (protocol-level INVOCATION parsing)
-- **Classic protocol (experimental)** - Basic support for Classic (legacy) Casambi firmware networks (unit control)
+- **Classic protocol support** - Lighting fixtures on Classic (legacy) Casambi firmware networks: on/off, dimming, and live state sync from the Casambi app. More testers welcome!
 
 ## Quick Start
 
@@ -64,7 +64,9 @@ Import ready-to-use blueprints with one click:
 
 Classic (legacy) firmware notes:
 - Discovery includes both EVO (`FE4D`) and Classic (`CA5A`) advertisements.
-- Classic support is currently focused on **controlling units**; state updates may be limited depending on firmware.
+- On/off, dimming, and bidirectional state sync are working for lighting fixtures.
+- Changes made in the Casambi app are reflected in HA in real time.
+- More testers welcome — if you have a Classic network, please [open an issue](https://github.com/rankjie/casambi-bt-hass/issues) with your experience.
 
 ## Network Setup
 

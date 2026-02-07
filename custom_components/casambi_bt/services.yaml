@@ -136,3 +136,10 @@ dump_classic_diagnostics:
       default: false
       selector:
         boolean:
+    all_networks:
+      name: All Networks
+      description: Dump diagnostics for all configured networks (ignores entry_id)
+      required: false
+      default: false
+      selector:
+        boolean:

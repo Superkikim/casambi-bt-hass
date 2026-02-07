@@ -344,7 +344,100 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             entry_id = call.data.get("entry_id")
             include_packet_history = call.data.get("include_packets", True)
             include_network_config = call.data.get("include_network_config", False)
+            all_networks = call.data.get("all_networks", False)
 
+            def _collect_diag_for_api(casa_api: CasambiApi) -> dict:
+                """Collect diagnostics for a single CasambiApi instance."""
+                casa = casa_api.casa
+                client = getattr(casa, "_casaClient", None)
+                network = getattr(casa, "_casaNetwork", None)
+
+                units = getattr(casa, "units", []) or []
+                units_with_security_key = sum(
+                    1 for u in units if getattr(u, "securityKey", None) is not None
+                )
+
+                protocol_mode = getattr(client, "protocolMode", None)
+                protocol_mode_name = getattr(protocol_mode, "name", None)
+
+                conn_hash8 = getattr(client, "_classicConnHash8", None)
+                conn_hash8_hex = conn_hash8.hex() if isinstance(conn_hash8, (bytes, bytearray)) else None
+
+                notify_uuids = getattr(client, "_classicNotifyCharUuids", None)
+                if isinstance(notify_uuids, set):
+                    notify_uuids = sorted(str(u) for u in notify_uuids)
+
+                # Get enhanced diagnostics from client if available
+                client_diag = {}
+                if client is not None and hasattr(client, "getClassicDiagnostics"):
+                    try:
+                        client_diag = client.getClassicDiagnostics()
+                    except Exception as e:
+                        client_diag = {"error": str(e)}
+
+                diag = {
+                    "entry_id": casa_api.conf_entry.entry_id,
+                    "address": casa_api.address,
+                    "connected": getattr(casa, "connected", False),
+                    "cloud_protocolVersion": getattr(network, "protocolVersion", None),
+                    "protocolMode": protocol_mode_name,
+                    "classic_header_mode": getattr(client, "_classicHeaderMode", None),
+                    "classic_hash_source": getattr(client, "_classicHashSource", None),
+                    "classic_data_uuid": getattr(client, "_dataCharUuid", None),
+                    "classic_tx_uuid": getattr(client, "_classicTxCharUuid", None),
+                    "classic_notify_uuids": notify_uuids,
+                    "classic_conn_hash8_hex": conn_hash8_hex,
+                    "classic_visitorKey_present": bool(getattr(network, "classicVisitorKey", lambda: None)()),
+                    "classic_managerKey_present": bool(getattr(network, "classicManagerKey", lambda: None)()),
+                    "cloud_session_is_manager": bool(getattr(network, "isManager", lambda: False)()),
+                    "classic_rx_stats": {
+                        "frames": getattr(client, "_classicRxFrames", None),
+                        "verified": getattr(client, "_classicRxVerified", None),
+                        "unverifiable": getattr(client, "_classicRxUnverifiable", None),
+                        "parse_fail": getattr(client, "_classicRxParseFail", None),
+                        "type6_unitstate": getattr(client, "_classicRxType6", None),
+                        "type7_switch": getattr(client, "_classicRxType7", None),
+                        "type9_netconf": getattr(client, "_classicRxType9", None),
+                        "cmdstream": getattr(client, "_classicRxCmdStream", None),
+                        "unknown": getattr(client, "_classicRxUnknown", None),
+                    },
+                    "classic_first_rx_ts": getattr(client, "_classicFirstRxTs", None),
+                    "units": len(units),
+                    "units_with_securityKey": units_with_security_key,
+                    "keyStore_present": bool(
+                        (getattr(casa, "rawNetworkData", None) or {})
+                        .get("network", {})
+                        .get("keyStore")
+                    ),
+                }
+
+                # Include packet history if requested
+                if include_packet_history:
+                    diag["classic_tx_history"] = client_diag.get("classic_tx_history", [])
+                    diag["classic_rx_history"] = client_diag.get("classic_rx_history", [])
+                    diag["classic_tx_count"] = client_diag.get("classic_tx_count", 0)
+                    diag["classic_rx_count"] = client_diag.get("classic_rx_count", 0)
+
+                # Include full network config if requested
+                if include_network_config:
+                    raw_network = casa.rawNetworkData
+                    if raw_network:
+                        diag["network_config"] = raw_network
+
+                return diag
+
+            # Dump all networks if requested
+            if all_networks:
+                all_diags = {}
+                for eid, api in hass.data.get(DOMAIN, {}).items():
+                    if isinstance(api, CasambiApi):
+                        all_diags[eid] = _collect_diag_for_api(api)
+                if not all_diags:
+                    raise ValueError("No Casambi connections available")
+                _LOGGER.warning("[CASAMBI_CLASSIC_DIAGNOSTICS_ALL] %s", all_diags)
+                return {"diagnostics": all_diags}
+
+            # Single network mode
             casa_api: CasambiApi | None = None
             if entry_id:
                 casa_api = hass.data.get(DOMAIN, {}).get(entry_id)
@@ -357,82 +450,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 if casa_api is None:
                     raise ValueError("No Casambi connection available")
 
-            casa = casa_api.casa
-            client = getattr(casa, "_casaClient", None)
-            network = getattr(casa, "_casaNetwork", None)
-
-            units = getattr(casa, "units", []) or []
-            units_with_security_key = sum(
-                1 for u in units if getattr(u, "securityKey", None) is not None
-            )
-
-            protocol_mode = getattr(client, "protocolMode", None)
-            protocol_mode_name = getattr(protocol_mode, "name", None)
-
-            conn_hash8 = getattr(client, "_classicConnHash8", None)
-            conn_hash8_hex = conn_hash8.hex() if isinstance(conn_hash8, (bytes, bytearray)) else None
-
-            notify_uuids = getattr(client, "_classicNotifyCharUuids", None)
-            if isinstance(notify_uuids, set):
-                notify_uuids = sorted(str(u) for u in notify_uuids)
-
-            # Get enhanced diagnostics from client if available
-            client_diag = {}
-            if client is not None and hasattr(client, "getClassicDiagnostics"):
-                try:
-                    client_diag = client.getClassicDiagnostics()
-                except Exception as e:
-                    client_diag = {"error": str(e)}
-
-            diag = {
-                "entry_id": casa_api.conf_entry.entry_id,
-                "address": casa_api.address,
-                "connected": getattr(casa, "connected", False),
-                "cloud_protocolVersion": getattr(network, "protocolVersion", None),
-                "protocolMode": protocol_mode_name,
-                "classic_header_mode": getattr(client, "_classicHeaderMode", None),
-                "classic_hash_source": getattr(client, "_classicHashSource", None),
-                "classic_data_uuid": getattr(client, "_dataCharUuid", None),
-                "classic_tx_uuid": getattr(client, "_classicTxCharUuid", None),
-                "classic_notify_uuids": notify_uuids,
-                "classic_conn_hash8_hex": conn_hash8_hex,
-                "classic_visitorKey_present": bool(getattr(network, "classicVisitorKey", lambda: None)()),
-                "classic_managerKey_present": bool(getattr(network, "classicManagerKey", lambda: None)()),
-                "cloud_session_is_manager": bool(getattr(network, "isManager", lambda: False)()),
-                "classic_rx_stats": {
-                    "frames": getattr(client, "_classicRxFrames", None),
-                    "verified": getattr(client, "_classicRxVerified", None),
-                    "unverifiable": getattr(client, "_classicRxUnverifiable", None),
-                    "parse_fail": getattr(client, "_classicRxParseFail", None),
-                    "type6_unitstate": getattr(client, "_classicRxType6", None),
-                    "type7_switch": getattr(client, "_classicRxType7", None),
-                    "type9_netconf": getattr(client, "_classicRxType9", None),
-                    "cmdstream": getattr(client, "_classicRxCmdStream", None),
-                    "unknown": getattr(client, "_classicRxUnknown", None),
-                },
-                "classic_first_rx_ts": getattr(client, "_classicFirstRxTs", None),
-                "units": len(units),
-                "units_with_securityKey": units_with_security_key,
-                "keyStore_present": bool(
-                    (getattr(casa, "rawNetworkData", None) or {})
-                    .get("network", {})
-                    .get("keyStore")
-                ),
-            }
-
-            # Include packet history if requested
-            if include_packet_history:
-                diag["classic_tx_history"] = client_diag.get("classic_tx_history", [])
-                diag["classic_rx_history"] = client_diag.get("classic_rx_history", [])
-                diag["classic_tx_count"] = client_diag.get("classic_tx_count", 0)
-                diag["classic_rx_count"] = client_diag.get("classic_rx_count", 0)
-
-            # Include full network config if requested
-            if include_network_config:
-                raw_network = casa.rawNetworkData
-                if raw_network:
-                    diag["network_config"] = raw_network
-
+            diag = _collect_diag_for_api(casa_api)
             _LOGGER.warning("[CASAMBI_CLASSIC_DIAGNOSTICS] %s", diag)
             return {"diagnostics": diag}
 

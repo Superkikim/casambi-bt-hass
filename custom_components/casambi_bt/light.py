@@ -152,8 +152,18 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
     def brightness(self) -> int | None:
         """Return the brightness of the unit."""
         unit = cast("Unit", self._obj)
-        if unit.state is not None:
-            return unit.state.dimmer
+        if unit.state is not None and unit.state.dimmer is not None:
+            dimmer = unit.state.dimmer
+
+            dimmer_ctrl = unit.unitType.get_control(UnitControlType.DIMMER)
+            if dimmer_ctrl is not None and dimmer_ctrl.length < 8:
+                internal_max = ((1 << dimmer_ctrl.length) - 1) << (
+                    8 - dimmer_ctrl.length
+                )
+                if internal_max > 0 and internal_max < 255:
+                    return max(0, min(255, round(dimmer * 255 / internal_max)))
+
+            return dimmer
         return None
 
     @property
@@ -195,6 +205,7 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the unit."""
         unit = cast("Unit", self._obj)
+        was_on_before = self.is_on
         state = copy(unit.state)
         if not state:
             state = UnitState()
@@ -256,12 +267,10 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
 
             if not was_set:
                 await self._api.casa.turnOn(self._obj)
-            elif ATTR_BRIGHTNESS not in kwargs:
-                # Ensure the unit actually turns on when setting non-dimmer attributes.
-                if self.brightness is not None:
-                    await self._api.casa.setLevel(unit, self.brightness)
-                else:
-                    await self._api.casa.turnOn(self._obj)
+            elif ATTR_BRIGHTNESS not in kwargs and not was_on_before:
+                # Ensure the unit turns on when setting non-dimmer attributes while it was off.
+                # Avoid replaying a potentially stale brightness via SetLevel (causes drift).
+                await self._api.casa.turnOn(self._obj)
             return
 
         await self._api.casa.turnOn(self._obj)

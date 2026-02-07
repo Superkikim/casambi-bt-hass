@@ -122,3 +122,17 @@ dump_classic_diagnostics:
       example: 01KG8AXQ57WSXCQ0W07CGMM4JP
       selector:
         text:
+    include_packets:
+      name: Include Packets
+      description: Include TX/RX packet history in the output
+      required: false
+      default: true
+      selector:
+        boolean:
+    include_network_config:
+      name: Include Network Config
+      description: Include full network configuration (units, groups, scenes, fixture types)
+      required: false
+      default: false
+      selector:
+        boolean:

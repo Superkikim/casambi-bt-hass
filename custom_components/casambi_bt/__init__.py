@@ -343,6 +343,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             """
             entry_id = call.data.get("entry_id")
             include_packet_history = call.data.get("include_packets", True)
+            include_network_config = call.data.get("include_network_config", False)
 
             casa_api: CasambiApi | None = None
             if entry_id:
@@ -425,6 +426,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 diag["classic_rx_history"] = client_diag.get("classic_rx_history", [])
                 diag["classic_tx_count"] = client_diag.get("classic_tx_count", 0)
                 diag["classic_rx_count"] = client_diag.get("classic_rx_count", 0)
+
+            # Include full network config if requested
+            if include_network_config:
+                raw_network = casa.rawNetworkData
+                if raw_network:
+                    diag["network_config"] = raw_network
 
             _LOGGER.warning("[CASAMBI_CLASSIC_DIAGNOSTICS] %s", diag)
             return {"diagnostics": diag}

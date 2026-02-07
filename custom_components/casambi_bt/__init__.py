@@ -380,6 +380,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     "address": casa_api.address,
                     "connected": getattr(casa, "connected", False),
                     "cloud_protocolVersion": getattr(network, "protocolVersion", None),
+                    "cloud_grade": getattr(network, "grade", None),
                     "protocolMode": protocol_mode_name,
                     "classic_header_mode": getattr(client, "_classicHeaderMode", None),
                     "classic_hash_source": getattr(client, "_classicHashSource", None),

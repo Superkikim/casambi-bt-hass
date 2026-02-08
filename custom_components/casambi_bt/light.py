@@ -152,18 +152,8 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
     def brightness(self) -> int | None:
         """Return the brightness of the unit."""
         unit = cast("Unit", self._obj)
-        if unit.state is not None and unit.state.dimmer is not None:
-            dimmer = unit.state.dimmer
-
-            dimmer_ctrl = unit.unitType.get_control(UnitControlType.DIMMER)
-            if dimmer_ctrl is not None and dimmer_ctrl.length < 8:
-                internal_max = ((1 << dimmer_ctrl.length) - 1) << (
-                    8 - dimmer_ctrl.length
-                )
-                if internal_max > 0 and internal_max < 255:
-                    return max(0, min(255, round(dimmer * 255 / internal_max)))
-
-            return dimmer
+        if unit.state is not None:
+            return unit.state.dimmer
         return None
 
     @property
@@ -244,32 +234,97 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
                 if not (self._api.is_classic_network or "Classic networks" in str(err)):
                     raise
 
+            desired_brightness = kwargs.get(ATTR_BRIGHTNESS)
+            current_brightness = (
+                unit.state.dimmer
+                if unit.state is not None and unit.state.dimmer is not None
+                else None
+            )
+
+            dimmer_ctrl = unit.unitType.get_control(UnitControlType.DIMMER)
+            rgb_ctrl = unit.unitType.get_control(UnitControlType.RGB)
+            white_ctrl = unit.unitType.get_control(UnitControlType.WHITE)
+            temp_ctrl = unit.unitType.get_control(UnitControlType.TEMPERATURE)
+            colorsource_ctrl = unit.unitType.get_control(UnitControlType.COLORSOURCE)
+            _LOGGER.debug(
+                "Classic fallback: unit=%i type=%i dimmer_bits=%s rgb_bits=%s white_bits=%s temp_bits=%s colorsource_bits=%s kwargs=%s",
+                unit.deviceId,
+                unit.unitType.id,
+                None if dimmer_ctrl is None else dimmer_ctrl.length,
+                None if rgb_ctrl is None else rgb_ctrl.length,
+                None if white_ctrl is None else white_ctrl.length,
+                None if temp_ctrl is None else temp_ctrl.length,
+                None if colorsource_ctrl is None else colorsource_ctrl.length,
+                {k: v for k, v in kwargs.items() if k in {ATTR_BRIGHTNESS, ATTR_RGB_COLOR, ATTR_RGBW_COLOR, ATTR_COLOR_TEMP_KELVIN, ATTR_XY_COLOR}},
+            )
+
             was_set = False
+            sent_level = False
             if ATTR_BRIGHTNESS in kwargs:
-                await self._api.casa.setLevel(unit, kwargs[ATTR_BRIGHTNESS])
-                was_set = True
+                if current_brightness is None or desired_brightness != current_brightness:
+                    _LOGGER.debug(
+                        "Classic fallback: setLevel unit=%i desired=%s current=%s",
+                        unit.deviceId,
+                        desired_brightness,
+                        current_brightness,
+                    )
+                    await self._api.casa.setLevel(unit, kwargs[ATTR_BRIGHTNESS])
+                    was_set = True
+                    sent_level = True
+                else:
+                    _LOGGER.debug(
+                        "Classic fallback: skip setLevel unit=%i desired=%s (unchanged)",
+                        unit.deviceId,
+                        desired_brightness,
+                    )
             if ATTR_RGB_COLOR in kwargs:
+                _LOGGER.debug(
+                    "Classic fallback: setColor unit=%i rgb=%s",
+                    unit.deviceId,
+                    kwargs[ATTR_RGB_COLOR],
+                )
                 await self._api.casa.setColor(unit, kwargs[ATTR_RGB_COLOR])
                 was_set = True
             elif ATTR_RGBW_COLOR in kwargs:
                 rgb, w = kwargs[ATTR_RGBW_COLOR][:3], kwargs[ATTR_RGBW_COLOR][3]
+                _LOGGER.debug(
+                    "Classic fallback: setColor+setWhite unit=%i rgb=%s white=%s",
+                    unit.deviceId,
+                    rgb,
+                    w,
+                )
                 await self._api.casa.setColor(unit, rgb)
                 await self._api.casa.setWhite(unit, w)
                 was_set = True
             if ATTR_COLOR_TEMP_KELVIN in kwargs:
+                _LOGGER.debug(
+                    "Classic fallback: setTemperature unit=%i kelvin=%s",
+                    unit.deviceId,
+                    kwargs[ATTR_COLOR_TEMP_KELVIN],
+                )
                 await self._api.casa.setTemperature(
                     unit, kwargs[ATTR_COLOR_TEMP_KELVIN]
                 )
                 was_set = True
             if ATTR_XY_COLOR in kwargs:
+                _LOGGER.debug(
+                    "Classic fallback: setColorXY unit=%i xy=%s",
+                    unit.deviceId,
+                    kwargs[ATTR_XY_COLOR],
+                )
                 await self._api.casa.setColorXY(unit, kwargs[ATTR_XY_COLOR])
                 was_set = True
 
             if not was_set:
-                await self._api.casa.turnOn(self._obj)
-            elif ATTR_BRIGHTNESS not in kwargs and not was_on_before:
-                # Ensure the unit turns on when setting non-dimmer attributes while it was off.
-                # Avoid replaying a potentially stale brightness via SetLevel (causes drift).
+                if desired_brightness is None or desired_brightness > 0:
+                    await self._api.casa.turnOn(self._obj)
+                else:
+                    await self._api.casa.setLevel(unit, 0)
+            elif not was_on_before and not sent_level and (
+                desired_brightness is None or desired_brightness > 0
+            ):
+                # Ensure the unit turns on when setting non-dimmer attributes while it was off,
+                # even if HA included brightness in kwargs but it didn't actually change.
                 await self._api.casa.turnOn(self._obj)
             return
 

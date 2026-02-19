@@ -35,31 +35,28 @@ BUTTON_ACTIONS: Final[dict[int, str]] = {
 
 
 def _is_switch_unit(unit: Unit) -> bool:
-    """Check if a unit is a switch based on its model or manufacturer."""
+    """Check if a unit is a switch based on its mode, model or manufacturer."""
+    # Mode-based detection takes priority (most reliable)
+    mode = unit.unitType.mode
+    if "Kinetic" in mode:
+        return True  # EnOcean kinetic switch (e.g. PTM215B)
+    if mode == "Sensor":
+        return False  # BT repeater, not a switch
+
     # Check model name
     model_lower = unit.unitType.model.lower()
     switch_keywords = {
-        "switch", "xpress", "button", "pushbutton", 
+        "switch", "xpress", "button", "pushbutton",
         "batteryswitch", "wall switch", "remote"
     }
     if any(keyword in model_lower for keyword in switch_keywords):
         return True
-    
+
     # Check manufacturer
     manufacturer_lower = unit.unitType.manufacturer.lower()
     if "switch" in manufacturer_lower:
         return True
-    
-    # Check if unit has no light controls but still has controls
-    light_controls = {
-        "DIMMER", "RGB", "WHITE", "TEMPERATURE", "XY", "COLORSOURCE", "ONOFF"
-    }
-    unit_controls = {c.type.name for c in unit.unitType.controls}
-    
-    # If it has controls but none are light controls, it might be a switch
-    if unit_controls and not unit_controls.intersection(light_controls):
-        return True
-    
+
     return False
 
 

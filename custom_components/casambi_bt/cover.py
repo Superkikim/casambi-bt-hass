@@ -119,6 +119,9 @@ class CasambiLamelCover(CasambiCover):
             | CoverEntityFeature.SET_TILT_POSITION
         )
 
+    # Physical range of the Winsol Lamel slat angle
+    TILT_MAX_DEGREES: float = 142.0
+
     @property
     def current_cover_tilt_position(self) -> int | None:
         """Return the current tilt (slat angle) position (0=closed, 100=open)."""
@@ -126,6 +129,14 @@ class CasambiLamelCover(CasambiCover):
         if unit.state is not None and unit.state.slider is not None:
             return unit.state.slider * 100 // 255
         return None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return tilt angle in degrees as extra attribute."""
+        tilt_pct = self.current_cover_tilt_position
+        if tilt_pct is not None:
+            return {"tilt_degrees": round(tilt_pct * self.TILT_MAX_DEGREES / 100, 1)}
+        return {}
 
     async def async_open_tilt(self, **kwargs) -> None:
         """Open the slats fully."""

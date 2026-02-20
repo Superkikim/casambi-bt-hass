@@ -552,7 +552,14 @@ class CasambiApi:
                 f"Failed to authenticate to network {self.address}"
             ) from err
         except Exception as err:  # pylint: disable=broad-except
-            raise ConfigEntryError(
+            # Treat as transient (e.g. BLE exchangeKey race at HA startup).
+            # ConfigEntryNotReady causes HA to retry automatically; do NOT use
+            # ConfigEntryError here or the user must reload manually every time.
+            _LOGGER.warning(
+                "Transient error connecting to %s (%s: %s) — HA will retry",
+                self.address, type(err).__name__, err,
+            )
+            raise ConfigEntryNotReady(
                 f"Unexpected error creating network {self.address}"
             ) from err
 

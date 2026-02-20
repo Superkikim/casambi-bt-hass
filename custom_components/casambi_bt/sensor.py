@@ -33,3 +33,7 @@ async def async_setup_entry(
     
     # Set up switch event sensors
     await async_setup_switch_sensors(hass, config_entry, async_add_entities)
+
+    # Set up Lamel internal temperature sensor
+    from .lamel_controls import async_setup_entry_sensor_lamel
+    await async_setup_entry_sensor_lamel(hass, config_entry, async_add_entities)

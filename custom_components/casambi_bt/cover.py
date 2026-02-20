@@ -9,7 +9,6 @@ from CasambiBt import Unit, UnitControlType
 
 from homeassistant.components.cover import (
     ATTR_POSITION,
-    ATTR_TILT_POSITION,
     CoverDeviceClass,
     CoverEntity,
     CoverEntityFeature,
@@ -40,20 +39,18 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Create the Casambi cover entities."""
+    """Create the Casambi cover entities.
+
+    All covers (SO! shutters and Lamel venetian blinds) use CasambiCover.
+    Tilt (slat angle) for Lamel is exposed as a NumberEntity in lamel_controls.py.
+    """
     casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
 
-    cover_entities = []
-    for unit in casa_api.get_units():
-        if not _is_cover_unit(unit):
-            continue
-        controls = {c.type for c in unit.unitType.controls}
-        if UnitControlType.SLIDER in controls:
-            cover_entities.append(CasambiLamelCover(casa_api, unit))
-            _LOGGER.debug("Adding lamel cover (with tilt): %s", unit.name)
-        else:
-            cover_entities.append(CasambiCover(casa_api, unit))
-            _LOGGER.debug("Adding cover: %s", unit.name)
+    cover_entities = [
+        CasambiCover(casa_api, unit)
+        for unit in casa_api.get_units()
+        if _is_cover_unit(unit)
+    ]
 
     _LOGGER.info("Creating %d cover entities", len(cover_entities))
     async_add_entities(cover_entities)
@@ -76,10 +73,14 @@ class CasambiCover(CasambiUnitEntity, CoverEntity):
 
     @property
     def current_cover_position(self) -> int | None:
-        """Return the current position (0=closed, 100=open)."""
+        """Return the current position (0=closed, 100=open).
+
+        Winsol/Casambi convention is inverted: dimmer=0 means fully open,
+        dimmer=255 means fully closed. We invert to match HA convention.
+        """
         unit = cast("Unit", self._obj)
         if unit.state is not None and unit.state.dimmer is not None:
-            return unit.state.dimmer * 100 // 255
+            return 100 - (unit.state.dimmer * 100 // 255)
         return None
 
     @property
@@ -91,65 +92,18 @@ class CasambiCover(CasambiUnitEntity, CoverEntity):
         return pos == 0
 
     async def async_open_cover(self, **kwargs) -> None:
-        """Open the cover."""
-        unit = cast("Unit", self._obj)
-        await self._api.casa.setLevel(unit, 255)
-
-    async def async_close_cover(self, **kwargs) -> None:
-        """Close the cover."""
+        """Open the cover (dimmer=0 in Winsol convention)."""
         unit = cast("Unit", self._obj)
         await self._api.casa.setLevel(unit, 0)
+
+    async def async_close_cover(self, **kwargs) -> None:
+        """Close the cover (dimmer=255 in Winsol convention)."""
+        unit = cast("Unit", self._obj)
+        await self._api.casa.setLevel(unit, 255)
 
     async def async_set_cover_position(self, **kwargs) -> None:
         """Move the cover to a specific position (0=closed, 100=open)."""
         unit = cast("Unit", self._obj)
         position = kwargs[ATTR_POSITION]
-        await self._api.casa.setLevel(unit, position * 255 // 100)
-
-
-class CasambiLamelCover(CasambiCover):
-    """Cover entity for Casambi venetian blinds with tilt (slat angle) control."""
-
-    def __init__(self, api: CasambiApi, unit: Unit) -> None:
-        """Initialize a Casambi lamel cover entity."""
-        super().__init__(api, unit)
-        self._attr_supported_features |= (
-            CoverEntityFeature.OPEN_TILT
-            | CoverEntityFeature.CLOSE_TILT
-            | CoverEntityFeature.SET_TILT_POSITION
-        )
-
-    # Physical range of the Winsol Lamel slat angle
-    TILT_MAX_DEGREES: float = 142.0
-
-    @property
-    def current_cover_tilt_position(self) -> int | None:
-        """Return the current tilt (slat angle) position (0=closed, 100=open)."""
-        unit = cast("Unit", self._obj)
-        if unit.state is not None and unit.state.slider is not None:
-            return unit.state.slider * 100 // 255
-        return None
-
-    @property
-    def extra_state_attributes(self) -> dict:
-        """Return tilt angle in degrees as extra attribute."""
-        tilt_pct = self.current_cover_tilt_position
-        if tilt_pct is not None:
-            return {"tilt_degrees": round(tilt_pct * self.TILT_MAX_DEGREES / 100, 1)}
-        return {}
-
-    async def async_open_tilt(self, **kwargs) -> None:
-        """Open the slats fully."""
-        unit = cast("Unit", self._obj)
-        await self._api.casa.setSlider(unit, 255)
-
-    async def async_close_tilt(self, **kwargs) -> None:
-        """Close the slats fully."""
-        unit = cast("Unit", self._obj)
-        await self._api.casa.setSlider(unit, 0)
-
-    async def async_set_cover_tilt_position(self, **kwargs) -> None:
-        """Set the slat angle (0=closed, 100=open)."""
-        unit = cast("Unit", self._obj)
-        tilt = kwargs[ATTR_TILT_POSITION]
-        await self._api.casa.setSlider(unit, tilt * 255 // 100)
+        # Invert: HA 100%=open → Winsol dimmer=0; HA 0%=closed → Winsol dimmer=255
+        await self._api.casa.setLevel(unit, (100 - position) * 255 // 100)

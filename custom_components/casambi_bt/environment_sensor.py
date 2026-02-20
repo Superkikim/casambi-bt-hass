@@ -43,7 +43,7 @@ _accumulated: dict[str, dict[int, int]] = {}
 # Rain and PIR are binary (0/1) → no state_class (no graph needed).
 # Wind and solar are continuous measurements → MEASUREMENT enables HA history graph.
 _SENSOR_SPECS: list[tuple[str, str, int, SensorStateClass | None]] = [
-    ("Pluie",            "mdi:weather-rainy",    1, None),                          # type 0: 0=sec, 1=pluie
+    ("Pluie",            "mdi:weather-rainy",    1, SensorStateClass.MEASUREMENT),  # type 0: raw value (1=sec, 5=pluie à confirmer)
     ("Vent",             "mdi:weather-windy",    4, SensorStateClass.MEASUREMENT),  # type 1: raw/4 = vitesse
     ("Ensoleillement",   "mdi:weather-sunny",    4, SensorStateClass.MEASUREMENT),  # type 2: raw/4 = valeur app (68/4=17 ✓)
     ("Présence (PIR)",   "mdi:motion-sensor",    1, None),                          # type 3: 0=absent, 1=présent
@@ -207,5 +207,5 @@ class CasambiEnvironmentSensor(CasambiUnitEntity, SensorEntity):
             "raw_state_hex": raw.hex() if raw else None,
             "current_packet_type": decoded[0] if decoded else None,
             "current_packet_value": decoded[1] if decoded else None,
-            "accumulated": dict(_accumulated.get(unit.uuid, {})),
+            "sensor_cache": dict(_accumulated.get(unit.uuid, {})),
         }

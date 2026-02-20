@@ -1,6 +1,6 @@
 {
   "domain": "casambi_bt",
-  "name": "Casambi Bluetooth",
+  "name": "Casambi Bluetooth (Superkikim fork)",
   "bluetooth": [
     {
       "service_uuid": "0000fe4d-0000-1000-8000-00805f9b34fb",
@@ -13,10 +13,10 @@
       "connectable": true
     }
   ],
-  "codeowners": ["@lkempf"],
+  "codeowners": ["@Superkikim"],
   "config_flow": true,
   "dependencies": ["bluetooth_adapters"],
-  "documentation": "https://github.com/lkempf/casambi-bt-hass",
+  "documentation": "https://github.com/Superkikim/casambi-bt-hass",
   "integration_type": "hub",
   "iot_class": "local_push",
   "requirements": ["casambi-bt-revamped==0.4.2.dev5"],

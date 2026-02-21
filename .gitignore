@@ -172,3 +172,6 @@ poetry.toml
 
 # Local release artifacts
 casambi_bt_hass_v*.zip
+
+# Local development resources (venv, scripts, notes — not for the repo)
+local_resources/

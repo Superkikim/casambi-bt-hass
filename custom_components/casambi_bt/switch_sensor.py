@@ -31,29 +31,24 @@ SWITCH_MODELS: Final[set[str]] = {
 
 
 def _is_switch_unit(unit: Unit) -> bool:
-    """Check if a unit is a switch based on its model or manufacturer."""
+    """Check if a unit is a switch based on its mode, model or manufacturer."""
+    # Mode-based detection takes priority (most reliable)
+    mode = unit.unitType.mode
+    if "Kinetic" in mode:
+        return True  # EnOcean kinetic switch (e.g. PTM215B)
+    if mode == "Sensor":
+        return False  # BT repeater, not a switch
+
     # Check model name
     model_lower = unit.unitType.model.lower()
     if any(keyword in model_lower for keyword in SWITCH_MODELS):
         return True
-    
+
     # Check manufacturer
     manufacturer_lower = unit.unitType.manufacturer.lower()
     if "switch" in manufacturer_lower:
         return True
-    
-    # Check if unit has no light controls (dimmer, rgb, etc)
-    # but still has controls (indicating it might be a switch)
-    # ONOFF is included as it's an actuator control, not a switch indicator
-    light_controls = {
-        "DIMMER", "RGB", "WHITE", "TEMPERATURE", "XY", "COLORSOURCE", "ONOFF"
-    }
-    unit_controls = {c.type.name for c in unit.unitType.controls}
-    
-    # If it has controls but none are light controls, it might be a switch
-    if unit_controls and not unit_controls.intersection(light_controls):
-        return True
-    
+
     return False
 
 

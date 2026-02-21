@@ -44,6 +44,16 @@ CASA_LIGHT_CTRL_TYPES: Final[list[UnitControlType]] = [
 _LOGGER = logging.getLogger(__name__)
 
 
+def _is_cover_unit(unit: Unit) -> bool:
+    """Return True if the unit should be treated as a cover (blind/shutter).
+
+    Cover units are identified by having an EXT/ mode (externally controlled
+    actuator) combined with a DIMMER control (position feedback).
+    """
+    controls = {c.type for c in unit.unitType.controls}
+    return unit.unitType.mode.startswith("EXT/") and UnitControlType.DIMMER in controls
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -52,8 +62,12 @@ async def async_setup_entry(
     """Create the Casambi light entities."""
     casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
 
+    # Exclude all EXT/ mode units (covers AND sensors like Sensor Platform V4)
+    # EXT/ units are externally driven actuators or sensors, never true lights.
     light_entities: list[CasambiLight] = [
-        CasambiLightUnit(casa_api, u) for u in casa_api.get_units(CASA_LIGHT_CTRL_TYPES)
+        CasambiLightUnit(casa_api, u)
+        for u in casa_api.get_units(CASA_LIGHT_CTRL_TYPES)
+        if not u.unitType.mode.startswith("EXT/")
     ]
 
     group_entities: list[CasambiLight] = []

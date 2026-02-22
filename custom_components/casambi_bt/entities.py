@@ -149,6 +149,7 @@ class CasambiUnitEntity(CasambiEntity, metaclass=ABCMeta):
     ) -> None:
         """Initialize Casambi Entity."""
         super().__init__(api, description, obj)
+        self._last_state_raw_hex: str | None = None
 
     @property
     def unique_id(self) -> str:
@@ -181,6 +182,20 @@ class CasambiUnitEntity(CasambiEntity, metaclass=ABCMeta):
         _LOGGER.debug("Handling state change for unit %i", unit.deviceId)
         if unit.state:
             self._obj = unit
+            if _LOGGER.isEnabledFor(logging.DEBUG):
+                state = unit.state
+                raw = getattr(state, "raw_state", None)
+                raw_hex = (
+                    raw.hex() if isinstance(raw, (bytes, bytearray)) else None
+                ) or None
+                if raw_hex != self._last_state_raw_hex:
+                    self._last_state_raw_hex = raw_hex
+                    as_dict = getattr(state, "as_dict", None)
+                    _LOGGER.debug(
+                        "Unit %i decoded state=%s",
+                        unit.deviceId,
+                        as_dict() if callable(as_dict) else state,
+                    )
         else:
             own_unit = cast("CasambiUnit", self._obj)
             # This update doesn't have a state.

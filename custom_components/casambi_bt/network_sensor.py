@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import logging
-from typing import Any, Final
+from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -25,31 +26,28 @@ async def async_setup_entry(
 ) -> None:
     """Set up Casambi network sensor entities."""
     casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
-    
+
     # Create network configuration sensor
     async_add_entities([CasambiNetworkConfigSensor(casa_api)])
 
 
 class CasambiNetworkConfigSensor(SensorEntity):
     """Sensor entity showing raw network configuration."""
-    
+
     def __init__(self, api: CasambiApi) -> None:
         """Initialize the network config sensor."""
         self._api = api
-        
+
         # Set entity attributes
         self._attr_has_entity_name = True
         self._attr_name = "Network Configuration"
         self._attr_unique_id = f"{api.casa.networkId}-network-config"
         self._attr_icon = "mdi:network"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        
+
     @property
     def device_info(self):
         """Return device info for the network."""
-        from homeassistant.helpers import device_registry
-        from homeassistant.helpers.device_registry import DeviceInfo
-        
         return DeviceInfo(
             identifiers={(DOMAIN, self._api.casa.networkId)},
             name=self._api.casa.networkName,
@@ -57,24 +55,24 @@ class CasambiNetworkConfigSensor(SensorEntity):
             model="Network",
             connections={(device_registry.CONNECTION_BLUETOOTH, self._api.address)},
         )
-    
+
     @property
     def native_value(self) -> str:
         """Return the state showing network info summary."""
         raw_data = self._api.casa.rawNetworkData
         if not raw_data:
             return "No network data available"
-        
+
         network = raw_data.get("network", {})
         return f"Rev {network.get('revision', 'unknown')} - {len(network.get('units', []))} units"
-    
+
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the raw network configuration as attributes."""
         raw_data = self._api.casa.rawNetworkData
         if not raw_data:
             return {"error": "No network data available"}
-        
+
         # Return the complete raw network data
         # Note: Home Assistant will automatically handle JSON serialization
         return {

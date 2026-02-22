@@ -241,7 +241,6 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
         if set_state:
             try:
                 await self._api.casa.setUnitState(unit, state)
-                return
             except ProtocolError as err:
                 # Classic networks don't support EVO INVOCATION packets for SetState.
                 # Fall back to individual operations supported by Classic.

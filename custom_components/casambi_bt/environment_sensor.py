@@ -125,6 +125,7 @@ class CasambiEnvironmentSensor(CasambiUnitEntity, SensorEntity):
         control_index: int,
         sensor_index: int,
     ) -> None:
+        """Initialize a Casambi environment sensor entity."""
         name, icon, _, sc = _SENSOR_SPECS[sensor_index]
         desc = TypedEntityDescription(
             key=unit.uuid,
@@ -143,26 +144,32 @@ class CasambiEnvironmentSensor(CasambiUnitEntity, SensorEntity):
     # -----------------------------------------------------------------------
     @property
     def state_class(self):
+        """Return the state class for this sensor."""
         return self._state_class
 
     @property
     def options(self):
+        """Return None (no fixed option list for numeric sensors)."""
         return None
 
     @property
     def last_reset(self):
+        """Return None (no accumulated total, only current measurement)."""
         return None
 
     @property
     def native_unit_of_measurement(self):
+        """Return None (raw dimensionless values until units are confirmed)."""
         return None
 
     @property
     def suggested_display_precision(self):
+        """Return None (use default precision)."""
         return None
 
     @property
     def suggested_unit_of_measurement(self):
+        """Return None (no unit conversion suggested)."""
         return None
 
     # -----------------------------------------------------------------------

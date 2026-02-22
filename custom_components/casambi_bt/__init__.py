@@ -9,20 +9,16 @@ import json
 import logging
 from pathlib import Path
 from typing import Final
-import yaml
 
 from CasambiBt import Casambi, Group, Scene, Unit, UnitControlType
 from CasambiBt.errors import AuthenticationError, BluetoothError, NetworkNotFoundError
+import yaml
 
 from homeassistant.components import bluetooth
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, CONF_PASSWORD
 from homeassistant.core import HomeAssistant, ServiceCall, callback
-from homeassistant.exceptions import (
-    ConfigEntryAuthFailed,
-    ConfigEntryError,
-    ConfigEntryNotReady,
-)
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import DOMAIN, PLATFORMS
@@ -42,11 +38,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Help testers verify the installed library build quickly.
     try:
-        import CasambiBt as _casambi_pkg  # local import for path logging + version
+        import CasambiBt as _casambi_pkg  # noqa: PLC0415  # local import for path logging + version
 
         lib_ver = getattr(_casambi_pkg, "__version__", "unknown")
         lib_path = getattr(_casambi_pkg, "__file__", "unknown")
-    except Exception:
+    except Exception:  # noqa: BLE001
         lib_ver = "unknown"
         lib_path = "unknown"
     _LOGGER.info("Using casambi-bt-revamped=%s (%s)", lib_ver, lib_path)
@@ -153,43 +149,43 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_setup_services(hass: HomeAssistant) -> None:
+async def async_setup_services(hass: HomeAssistant) -> None:  # noqa: C901
     """Set up services for the Casambi integration."""
-    
+
     # Register get_network_config service if not already registered
     if not hass.services.has_service(DOMAIN, "get_network_config"):
         async def handle_get_network_config(call: ServiceCall) -> dict:
             """Handle the get_network_config service call."""
             unit_id = call.data.get("unit_id")
             output_format = call.data.get("format", "json")
-            
+
             # Get the first configured entry (could be enhanced to support multiple)
             entries = hass.config_entries.async_entries(DOMAIN)
             if not entries:
                 raise ValueError("No Casambi integration configured")
-            
+
             entry = entries[0]
             casa_api: CasambiApi = hass.data[DOMAIN][entry.entry_id]
-            
+
             # Get the raw network data
             raw_data = casa_api.casa.rawNetworkData
             if not raw_data:
                 raise ValueError("No network data available")
-            
+
             # If unit_id is specified, extract just that unit's data
             if unit_id is not None:
                 network = raw_data.get("network", {})
                 units = network.get("units", [])
-                
+
                 unit_data = None
                 for unit in units:
                     if unit.get("deviceID") == unit_id:
                         unit_data = unit
                         break
-                
+
                 if not unit_data:
                     raise ValueError(f"Unit with ID {unit_id} not found")
-                
+
                 result_data = {
                     "unit": unit_data,
                     "network_id": casa_api.casa.networkId,
@@ -198,13 +194,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             else:
                 # Return full network config
                 result_data = raw_data
-            
+
             # Format the output
             if output_format == "yaml":
                 return {"config": yaml.dump(result_data, default_flow_style=False)}
-            else:
-                return {"config": json.dumps(result_data, indent=2)}
-        
+            return {"config": json.dumps(result_data, indent=2)}
+
         # Register the service
         hass.services.async_register(
             DOMAIN,
@@ -213,7 +208,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             supports_response="only",
         )
         _LOGGER.info("Registered get_network_config service")
-    
+
     # Register update_button_config service if not already registered
     if not hass.services.has_service(DOMAIN, "update_button_config"):
         async def handle_update_button_config(call: ServiceCall) -> None:
@@ -222,16 +217,16 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             button_index = call.data.get("button_index")
             action_type = call.data.get("action_type")
             target_unit_id = call.data.get("target_unit_id")
-            
+
             # Get the first available CasambiApi instance
             casa_api = None
             for entry_id in hass.data.get(DOMAIN, {}):
                 casa_api = hass.data[DOMAIN][entry_id]
                 break
-            
+
             if not casa_api:
                 raise ValueError("No Casambi connection available")
-            
+
             # Update cached button config in library
             await casa_api.casa.update_button_config(
                 unit_id=unit_id,
@@ -255,7 +250,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 _LOGGER.info(
                     "Applied switchConfig via SetParameter after update (unit=%s, tag=1)", unit_id
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 _LOGGER.info(
                     "SetParameter apply failed for unit %s after update (%s). Falling back to ExtPacket.",
                     unit_id,
@@ -265,7 +260,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 _LOGGER.info(
                     "Applied switchConfig via ExtPacket after update (unit=%s)", unit_id
                 )
-    
+
         # Register the update_button_config service
         hass.services.async_register(
             DOMAIN,
@@ -309,7 +304,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     _LOGGER.info(
                         "Applied switchConfig via SetParameter (unit=%s, tag=%s)", unit_id, tag
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     # Fallback to ext method on size or protocol error
                     _LOGGER.info(
                         "SetParameter failed for unit %s (%s). Falling back to ExtPacket.",
@@ -372,7 +367,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 if client is not None and hasattr(client, "getClassicDiagnostics"):
                     try:
                         client_diag = client.getClassicDiagnostics()
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         client_diag = {"error": str(e)}
 
                 diag = {

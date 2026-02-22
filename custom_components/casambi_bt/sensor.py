@@ -27,13 +27,13 @@ async def async_setup_entry(
 
     # Set up network configuration sensor
     await async_setup_network_sensors(hass, config_entry, async_add_entities)
-    
+
     # Set up switch configuration sensors
     await async_setup_switch_config_sensors(hass, config_entry, async_add_entities)
-    
+
     # Set up switch event sensors
     await async_setup_switch_sensors(hass, config_entry, async_add_entities)
 
     # Set up Lamel internal temperature sensor
-    from .lamel_controls import async_setup_entry_sensor_lamel
+    from .lamel_controls import async_setup_entry_sensor_lamel  # noqa: PLC0415
     await async_setup_entry_sensor_lamel(hass, config_entry, async_add_entities)

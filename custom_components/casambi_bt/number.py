@@ -56,7 +56,7 @@ async def async_setup_entry(
     async_add_entities(light_entities + group_entities)
 
     # Lamel Intelligent (Star): Cool/Warm temperature setpoint
-    from .lamel_controls import async_setup_entry_number
+    from .lamel_controls import async_setup_entry_number  # noqa: PLC0415
     await async_setup_entry_number(hass, config_entry, async_add_entities)
 
 

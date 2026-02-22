@@ -104,6 +104,10 @@ class CasambiSwitchSensor(SensorEntity):
         self._api.unregister_switch_event_callback(self._handle_switch_event)
         await super().async_will_remove_from_hass()
 
+    def _is_kinetic_switch(self) -> bool:
+        """Return True for EnOcean kinetic switches (e.g. PTM215B)."""
+        return "Kinetic" in self._unit.unitType.mode
+
     @callback
     def _handle_switch_event(self, event_data: dict[str, Any]) -> None:
         """Handle incoming switch events."""
@@ -111,10 +115,22 @@ class CasambiSwitchSensor(SensorEntity):
         if event_data.get("unit_id") != self._unit.deviceId:
             return
 
-        _LOGGER.debug(
-            "Switch sensor event for %s: button=%s, event=%s",
-            self.name, event_data.get("button"), event_data.get("event"),
-        )
+        raw_index = event_data.get("button_event_index")
+        if raw_index is None:
+            raw_index = event_data.get("input_index")
+        button_raw = (raw_index + 1) if raw_index is not None else None
+        button_app = event_data.get("button")
+        event_type = event_data.get("event")
+
+        if event_type in ("button_press", "button_hold"):
+            _LOGGER.debug(
+                "[CASAMBI_BTN] %s | event=%-28s | button_raw=%s (index+1) | button_app=%s (lib guess) | kinetic=%s",
+                self._unit.name,
+                event_type,
+                button_raw,
+                button_app,
+                self._is_kinetic_switch(),
+            )
 
         # Store the event data
         self._last_event_data = event_data
@@ -141,10 +157,16 @@ class CasambiSwitchSensor(SensorEntity):
         if not self._last_event_data:
             return "No events"
 
-        button = self._last_event_data.get("button", "?")
+        raw_index = self._last_event_data.get("button_event_index")
+        if raw_index is None:
+            raw_index = self._last_event_data.get("input_index")
+        button_raw = (raw_index + 1) if raw_index is not None else None
+        button_app = self._last_event_data.get("button")
+        # EnOcean kinetic switches (PTM215B): raw index is correct.
+        # Other switches: use lib's guess (untested with other devices).
+        button_display = button_raw if self._is_kinetic_switch() else (button_app or button_raw or "?")
         event_type = self._last_event_data.get("event", "unknown")
 
-        # Create a readable state string
         event_map = {
             "button_press": "pressed",
             "button_hold": "held",
@@ -153,7 +175,7 @@ class CasambiSwitchSensor(SensorEntity):
         }
 
         event_text = event_map.get(event_type, event_type)
-        return f"Button {button} {event_text}"
+        return f"Button {button_display} {event_text}"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -162,10 +184,14 @@ class CasambiSwitchSensor(SensorEntity):
 
         # Add all event data if available
         if self._last_event_data:
+            raw_index = self._last_event_data.get("button_event_index")
+            if raw_index is None:
+                raw_index = self._last_event_data.get("input_index")
             attrs.update({
                 "event_type": self._last_event_data.get("event"),
-                "action": self._last_event_data.get("event"),  # Match HA event format
-                "button": self._last_event_data.get("button"),
+                "action": self._last_event_data.get("event"),
+                "button_raw": (raw_index + 1) if raw_index is not None else None,
+                "button_app": self._last_event_data.get("button"),
                 "unit_id": self._last_event_data.get("unit_id"),
                 "message_type": self._last_event_data.get("message_type"),
                 "flags": self._last_event_data.get("flags"),

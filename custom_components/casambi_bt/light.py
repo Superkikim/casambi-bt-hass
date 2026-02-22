@@ -246,6 +246,8 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
                 # Fall back to individual operations supported by Classic.
                 if not (self._api.is_classic_network or "Classic networks" in str(err)):
                     raise
+            else:
+                return
 
             desired_brightness = kwargs.get(ATTR_BRIGHTNESS)
             current_brightness = (

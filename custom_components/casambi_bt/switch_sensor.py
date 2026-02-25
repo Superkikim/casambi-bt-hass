@@ -149,7 +149,9 @@ class CasambiSwitchSensor(SensorEntity):
 
         _LOGGER.debug(
             "[CASAMBI_BTN] %s | button=%s | command=%s",
-            self._unit.name, button, command,
+            self._unit.name,
+            button,
+            command,
         )
 
         self._last_button = button

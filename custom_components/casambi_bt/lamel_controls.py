@@ -55,19 +55,22 @@ _accumulated_lamel: dict[str, dict[int, int]] = {}
 _TEMP_HEADER: int = 1
 
 # ── Bit-level control offsets (bits in the 7-byte state) ─────────────────────
-_CTRL_TEMP_BLOB_OFFSET: Final = 4   # sensorgroupvalue blob start (24 bits, read-only)
-_CTRL_SHADOW_OFFSET: Final = 28     # DIMMER $shadow : Ombre/Soleil  (8 bits, 0=sun, 255=shadow)
-_CTRL_POS_OFFSET: Final = 36        # SLIDER $pos   : Louvre position (8 bits, 0-255 = 0-142°)
-_CTRL_TEMP_OFFSET: Final = 44       # SLIDER $temp  : Cool/Warm (8 bits, 0-255 = 15-30°C)
-_CTRL_AUTO_OFFSET: Final = 52       # ONOFF $auto   : Automatique
-_CTRL_INTEL_OFFSET: Final = 53      # ONOFF $intel  : Intelligent
-_CTRL_START_OFFSET: Final = 54      # ONOFF $startstop : toggle louvre open/close
+_CTRL_TEMP_BLOB_OFFSET: Final = 4  # sensorgroupvalue blob start (24 bits, read-only)
+_CTRL_SHADOW_OFFSET: Final = (
+    28  # DIMMER $shadow : Ombre/Soleil  (8 bits, 0=sun, 255=shadow)
+)
+_CTRL_POS_OFFSET: Final = 36  # SLIDER $pos   : Louvre position (8 bits, 0-255 = 0-142°)
+_CTRL_TEMP_OFFSET: Final = 44  # SLIDER $temp  : Cool/Warm (8 bits, 0-255 = 15-30°C)
+_CTRL_AUTO_OFFSET: Final = 52  # ONOFF $auto   : Automatique
+_CTRL_INTEL_OFFSET: Final = 53  # ONOFF $intel  : Intelligent
+_CTRL_START_OFFSET: Final = 54  # ONOFF $startstop : toggle louvre open/close
 
-_TEMP_MIN: Final = 15.0             # °C (Cool/Warm setpoint range)
-_TEMP_MAX: Final = 30.0             # °C
+_TEMP_MIN: Final = 15.0  # °C (Cool/Warm setpoint range)
+_TEMP_MAX: Final = 30.0  # °C
 
 
 # ── Detection ─────────────────────────────────────────────────────────────────
+
 
 def _is_lamel_intelligent(unit: Unit) -> bool:
     """Return True for a Winsol Lamel Intelligent (Star) — has DIMMER+SLIDER+ONOFF."""
@@ -81,6 +84,7 @@ def _is_lamel_intelligent(unit: Unit) -> bool:
 
 
 # ── Raw-state bit helpers ─────────────────────────────────────────────────────
+
 
 def _read_bits(raw: bytes, offset: int, length: int) -> int:
     """Read `length` bits at bit `offset` from raw state bytes (little-endian)."""
@@ -105,11 +109,13 @@ def _write_bits(raw: bytearray, offset: int, length: int, value: int) -> None:
 
 async def _send_raw_state(api: CasambiApi, unit: Unit, raw: bytearray) -> None:
     """Send a full raw-state packet to the unit (bypasses UnitState abstraction)."""
-    from CasambiBt._operation import OpCode  # private but stable across dev versions  # noqa: PLC0415, I001
+    from CasambiBt._operation import OpCode  # private but stable  # noqa: PLC0415
+
     await api.casa._send(unit, bytes(raw), OpCode.SetState)  # noqa: SLF001
 
 
 # ── Platform setup functions ──────────────────────────────────────────────────
+
 
 async def async_setup_entry_switch(
     hass: HomeAssistant,
@@ -124,7 +130,7 @@ async def async_setup_entry_switch(
         if not _is_lamel_intelligent(unit):
             continue
         for name, bit_offset, icon in [
-            ("Automatique", _CTRL_AUTO_OFFSET,  "mdi:auto-fix"),
+            ("Automatique", _CTRL_AUTO_OFFSET, "mdi:auto-fix"),
             ("Intelligent", _CTRL_INTEL_OFFSET, "mdi:brain"),
         ]:
             entities.append(CasambiLamelSwitch(casa_api, unit, name, bit_offset, icon))
@@ -195,11 +201,17 @@ async def async_setup_entry_sensor_lamel(
 
 # ── Entity classes ────────────────────────────────────────────────────────────
 
+
 class CasambiLamelSwitch(CasambiUnitEntity, SwitchEntity):
     """HA switch for one ONOFF control of a Winsol Lamel Intelligent unit."""
 
     def __init__(
-        self, api: CasambiApi, unit: Unit, name: str, bit_offset: int, icon: str,
+        self,
+        api: CasambiApi,
+        unit: Unit,
+        name: str,
+        bit_offset: int,
+        icon: str,
     ) -> None:
         """Initialise a Lamel switch for the given ONOFF bit offset."""
         desc = TypedEntityDescription(
@@ -275,7 +287,9 @@ class CasambiLamelShadowSun(CasambiUnitEntity, NumberEntity):
     def __init__(self, api: CasambiApi, unit: Unit) -> None:
         """Initialise the Shadow/Sun number entity for the given unit."""
         desc = TypedEntityDescription(
-            key=unit.uuid, name="Ombre / Soleil", entity_type="lamel-shadow-sun",
+            key=unit.uuid,
+            name="Ombre / Soleil",
+            entity_type="lamel-shadow-sun",
         )
         super().__init__(api, desc, unit)
         self._attr_icon = "mdi:weather-partly-cloudy"
@@ -311,7 +325,9 @@ class CasambiLamelTiltDegrees(CasambiUnitEntity, NumberEntity):
     def __init__(self, api: CasambiApi, unit: Unit) -> None:
         """Initialise the louvre tilt-angle number entity for the given unit."""
         desc = TypedEntityDescription(
-            key=unit.uuid, name="Position des louvres", entity_type="lamel-tilt-degrees",
+            key=unit.uuid,
+            name="Position des louvres",
+            entity_type="lamel-tilt-degrees",
         )
         super().__init__(api, desc, unit)
         self._attr_icon = "mdi:angle-acute"
@@ -347,7 +363,9 @@ class CasambiLamelCoolWarm(CasambiUnitEntity, NumberEntity):
     def __init__(self, api: CasambiApi, unit: Unit) -> None:
         """Initialise the Cool/Warm temperature-setpoint number entity for the given unit."""
         desc = TypedEntityDescription(
-            key=unit.uuid, name="Froid/Chaud", entity_type="lamel-coolwarm",
+            key=unit.uuid,
+            name="Froid/Chaud",
+            entity_type="lamel-coolwarm",
         )
         super().__init__(api, desc, unit)
         self._attr_icon = "mdi:thermometer"
@@ -390,7 +408,9 @@ class CasambiLamelTemperature(CasambiUnitEntity, SensorEntity):
     def __init__(self, api: CasambiApi, unit: Unit) -> None:
         """Initialise the internal-temperature sensor entity for the given unit."""
         desc = TypedEntityDescription(
-            key=unit.uuid, name="Température module", entity_type="lamel-temperature",
+            key=unit.uuid,
+            name="Température module",
+            entity_type="lamel-temperature",
         )
         super().__init__(api, desc, unit)
         self._attr_icon = "mdi:thermometer"
@@ -438,8 +458,8 @@ class CasambiLamelTemperature(CasambiUnitEntity, SensorEntity):
         if unit.state is None or unit.state.raw_state is None:
             return None
         raw = unit.state.raw_state
-        header = _read_bits(raw, 0, 4)          # bits 0-3: sensorgroup header
-        blob_byte0 = _read_bits(raw, 4, 8)      # bits 4-11: sensor value
+        header = _read_bits(raw, 0, 4)  # bits 0-3: sensorgroup header
+        blob_byte0 = _read_bits(raw, 4, 8)  # bits 4-11: sensor value
 
         # Accumulate latest value per header (one packet per sensor, rotating)
         acc = _accumulated_lamel.setdefault(unit.uuid, {})

@@ -83,5 +83,7 @@ class CasambiNetworkConfigSensor(SensorEntity):
             "protocol_version": raw_data.get("network", {}).get("protocolVersion"),
             "unit_count": len(raw_data.get("network", {}).get("units", [])),
             "scene_count": len(raw_data.get("network", {}).get("scenes", [])),
-            "group_count": len(raw_data.get("network", {}).get("grid", {}).get("cells", [])),
+            "group_count": len(
+                raw_data.get("network", {}).get("grid", {}).get("cells", [])
+            ),
         }

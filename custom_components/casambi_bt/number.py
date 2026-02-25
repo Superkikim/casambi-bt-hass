@@ -59,6 +59,10 @@ async def async_setup_entry(
     from .lamel_controls import async_setup_entry_number  # noqa: PLC0415
     await async_setup_entry_number(hass, config_entry, async_add_entities)
 
+    # PWM+RGB+TW lights: White/Color cross-fade slider (WHITECOLORBALANCE)
+    from .white_color_balance import async_setup_entry_number_white_color_balance  # noqa: PLC0415
+    await async_setup_entry_number_white_color_balance(hass, config_entry, async_add_entities)
+
 
 class TypedNumberEntityDescription(TypedEntityDescription, NumberEntityDescription):
     """Describes a CasambiVerticalNumberUnit."""

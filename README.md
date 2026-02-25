@@ -2,16 +2,18 @@
 
 [![Discord](https://img.shields.io/discord/1186445089317326888)](https://discord.gg/jgZVugfx)
 
-An enhanced fork of the [original Casambi Bluetooth integration](https://github.com/lkempf/casambi-bt-hass) by [@lkempf](https://github.com/lkempf), with additional features for better switch and relay support.
+An enhanced fork of the [original Casambi Bluetooth integration](https://github.com/lkempf/casambi-bt-hass) by [@lkempf](https://github.com/lkempf), with additional features for better switch, relay, cover and light support.
 
 > ⚠️ **DEVELOPMENT WARNING**: This repository is used as a development environment. Things might break at any moment. It's recommended to wait at least 1 day after a new release before updating to ensure stability. All stable changes will be merged back to the original repository.
-> 
-> **When to use this fork**: Use this version if you need Classic firmware support, want to use Casambi switches in Home Assistant (usable but still being improved), or need relay support. Otherwise, stick with the original integration.
+>
+> **When to use this fork**: Use this version if you need Classic firmware support, want to use Casambi switches in Home Assistant (usable but still being improved), or need cover/relay support. Otherwise, stick with the original integration.
 
 ## What's Enhanced
 
 - **Classic protocol support** - Lighting fixtures on Classic (legacy) Casambi firmware networks: on/off, dimming, and live state sync from the Casambi app. More testers welcome!
-- **Switch event support** - Physical switch button press/hold/release events (wired + wireless)
+- **Switch event support** - Physical switch button press/hold/release events (wired + wireless), fired as `casambi_bt_button_event` HA events for clean automation triggers
+- **Motor-driven covers** - Blinds and shutters appear as HA cover entities with open/close/stop and position control
+- **White/Color balance slider** - RGB/TW lights expose a `Blanc / Couleur` number entity (0% = pure white, 100% = pure color)
 - **Automation blueprints** - Ready-to-use blueprints for button automations
 - **Fixed relay status** - Properly reports the status of relay units (also merged to the original integration)
 - **Based on casambi-bt-revamped** - Uses an enhanced version of the underlying library (protocol-level INVOCATION parsing)
@@ -37,12 +39,22 @@ An enhanced fork of the [original Casambi Bluetooth integration](https://github.
 ## Features
 
 ### 📱 Switch Button Events
-Physical switches fire events for automations:
-- Button press, hold, and release detection
-- Hold/release-after-hold are emitted when the device/firmware sends them (no timer-based synthesis)
-- Support for short/long press actions
+Physical switches fire `casambi_bt_button_event` HA events:
+- Commands: `pressed`, `held`, `released`, `released_after_hold`
+- Works with EnOcean PTM215B (Kinetic) and wired switches
+- Use event data `unit_name`, `button`, `command` in automations
 
 [**→ Detailed Switch Event Documentation**](docs/SWITCH_EVENTS.md)
+
+### 🪟 Motor-Driven Covers
+Casambi `EXT/1ch/Dim` units (blinds, shutters) are exposed as HA cover entities:
+- Open, close, stop
+- Position control (0-100%)
+- Tilt angle for louvre-type blinds (where supported)
+
+### 💡 Light Features
+- Dimmer, color (RGB), color temperature (TW), on/off
+- **White/Color balance**: RGB/TW lights with a WHITECOLORBALANCE control get a `Blanc / Couleur` slider (0% = pure white, 100% = pure color)
 
 ### 🎯 Automation Blueprints
 Import ready-to-use blueprints with one click:
@@ -56,10 +68,11 @@ Import ready-to-use blueprints with one click:
 [**→ Blueprint Documentation & Examples**](docs/BLUEPRINTS.md)
 
 ### 💡 Supported Devices
-- Lights (dimmer, color, temperature, on/off)
+- Lights (dimmer, color, temperature, on/off, white/color balance)
 - Light groups
 - Scenes
 - Switches (as events, not entities)
+- Motor-driven covers (blinds, shutters)
 - Relays
 
 Classic (legacy) firmware notes:

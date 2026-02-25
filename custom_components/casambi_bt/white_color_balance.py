@@ -40,10 +40,11 @@ _LOGGER = logging.getLogger(__name__)
 # Signature that identifies a WHITECOLORBALANCE control
 _WCB_LENGTH: int = 6
 _WCB_MAX: int = 63
-_WCB_DEFAULT: int = 31   # midpoint (both channels at 100%)
+_WCB_DEFAULT: int = 31  # midpoint (both channels at 100%)
 
 
 # ── Detection ─────────────────────────────────────────────────────────────────
+
 
 def _find_wcb_control(unit: Unit):
     """Return the WHITECOLORBALANCE control for the unit, or None if absent.
@@ -76,6 +77,7 @@ def _is_white_color_balance_unit(unit: Unit) -> bool:
 
 # ── Raw-state bit helpers ─────────────────────────────────────────────────────
 
+
 def _read_bits(raw: bytes, offset: int, length: int) -> int:
     """Read `length` bits at bit `offset` from raw state bytes (little-endian)."""
     byte_offset = offset // 8
@@ -100,10 +102,12 @@ def _write_bits(raw: bytearray, offset: int, length: int, value: int) -> None:
 async def _send_raw_state(api: CasambiApi, unit: Unit, raw: bytearray) -> None:
     """Send a full raw-state packet to the unit (bypasses UnitState abstraction)."""
     from CasambiBt._operation import OpCode  # private but stable  # noqa: PLC0415
+
     await api.casa._send(unit, bytes(raw), OpCode.SetState)  # noqa: SLF001
 
 
 # ── Platform setup ────────────────────────────────────────────────────────────
+
 
 async def async_setup_entry_number_white_color_balance(
     hass: HomeAssistant,
@@ -125,6 +129,7 @@ async def async_setup_entry_number_white_color_balance(
 
 
 # ── Entity class ──────────────────────────────────────────────────────────────
+
 
 class CasambiWhiteColorBalance(CasambiUnitEntity, NumberEntity):
     """HA number entity for the WHITECOLORBALANCE cross-fade slider.

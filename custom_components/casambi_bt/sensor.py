@@ -36,4 +36,5 @@ async def async_setup_entry(
 
     # Set up Lamel internal temperature sensor
     from .lamel_controls import async_setup_entry_sensor_lamel  # noqa: PLC0415
+
     await async_setup_entry_sensor_lamel(hass, config_entry, async_add_entities)

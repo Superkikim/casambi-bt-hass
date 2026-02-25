@@ -1,4 +1,5 @@
 """Environmental sensor entities for Casambi Sensor Platform V4 units."""
+
 from __future__ import annotations
 
 import logging
@@ -43,10 +44,25 @@ _accumulated: dict[str, dict[int, int]] = {}
 # Rain and PIR are binary (0/1) → no state_class (no graph needed).
 # Wind and solar are continuous measurements → MEASUREMENT enables HA history graph.
 _SENSOR_SPECS: list[tuple[str, str, int, SensorStateClass | None]] = [
-    ("Pluie",            "mdi:weather-rainy",    1, SensorStateClass.MEASUREMENT),  # type 0: raw value (1=sec, 5=pluie — confirmed)
-    ("Vent",             "mdi:weather-windy",    4, SensorStateClass.MEASUREMENT),  # type 1: raw/4 = vitesse
-    ("Ensoleillement",   "mdi:weather-sunny",    4, SensorStateClass.MEASUREMENT),  # type 2: raw/4 = valeur app (68/4=17 ✓)
-    ("Présence (PIR)",   "mdi:motion-sensor",    1, None),                          # type 3: 0=absent, 1=présent
+    (
+        "Pluie",
+        "mdi:weather-rainy",
+        1,
+        SensorStateClass.MEASUREMENT,
+    ),  # type 0: raw value (1=sec, 5=pluie — confirmed)
+    (
+        "Vent",
+        "mdi:weather-windy",
+        4,
+        SensorStateClass.MEASUREMENT,
+    ),  # type 1: raw/4 = vitesse
+    (
+        "Ensoleillement",
+        "mdi:weather-sunny",
+        4,
+        SensorStateClass.MEASUREMENT,
+    ),  # type 2: raw/4 = valeur app (68/4=17 ✓)
+    ("Présence (PIR)", "mdi:motion-sensor", 1, None),  # type 3: 0=absent, 1=présent
 ]
 
 
@@ -100,13 +116,15 @@ async def async_setup_entry(
             count,
         )
 
-        for sensor_index, (control_index, _control) in enumerate(sensor_controls[:count]):
+        for sensor_index, (control_index, _control) in enumerate(
+            sensor_controls[:count]
+        ):
             entities.append(
                 CasambiEnvironmentSensor(
                     casa_api,
                     unit,
-                    control_index,   # used only to keep the existing unique_id stable
-                    sensor_index,    # == packet_type (0–3)
+                    control_index,  # used only to keep the existing unique_id stable
+                    sensor_index,  # == packet_type (0–3)
                 )
             )
 
@@ -133,7 +151,7 @@ class CasambiEnvironmentSensor(CasambiUnitEntity, SensorEntity):
             entity_type=f"env-sensor-{control_index}",  # unchanged → stable unique_id
         )
         super().__init__(api, desc, unit)
-        self._sensor_index = sensor_index   # = packet_type this entity reads
+        self._sensor_index = sensor_index  # = packet_type this entity reads
         self._attr_icon = icon
         self._state_class = sc
 

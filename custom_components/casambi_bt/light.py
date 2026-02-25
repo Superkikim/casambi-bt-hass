@@ -271,13 +271,27 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
                 None if white_ctrl is None else white_ctrl.length,
                 None if temp_ctrl is None else temp_ctrl.length,
                 None if colorsource_ctrl is None else colorsource_ctrl.length,
-                {k: v for k, v in kwargs.items() if k in {ATTR_BRIGHTNESS, ATTR_RGB_COLOR, ATTR_RGBW_COLOR, ATTR_COLOR_TEMP_KELVIN, ATTR_XY_COLOR}},
+                {
+                    k: v
+                    for k, v in kwargs.items()
+                    if k
+                    in {
+                        ATTR_BRIGHTNESS,
+                        ATTR_RGB_COLOR,
+                        ATTR_RGBW_COLOR,
+                        ATTR_COLOR_TEMP_KELVIN,
+                        ATTR_XY_COLOR,
+                    }
+                },
             )
 
             was_set = False
             sent_level = False
             if ATTR_BRIGHTNESS in kwargs:
-                if current_brightness is None or desired_brightness != current_brightness:
+                if (
+                    current_brightness is None
+                    or desired_brightness != current_brightness
+                ):
                     _LOGGER.debug(
                         "Classic fallback: setLevel unit=%i desired=%s current=%s",
                         unit.deviceId,
@@ -336,8 +350,10 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
                     await self._api.casa.turnOn(self._obj)
                 else:
                     await self._api.casa.setLevel(unit, 0)
-            elif not was_on_before and not sent_level and (
-                desired_brightness is None or desired_brightness > 0
+            elif (
+                not was_on_before
+                and not sent_level
+                and (desired_brightness is None or desired_brightness > 0)
             ):
                 # Ensure the unit turns on when setting non-dimmer attributes while it was off,
                 # even if HA included brightness in kwargs but it didn't actually change.
@@ -357,7 +373,9 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
                 unit = cast("Unit", self._obj)
                 try:
                     await self._api.casa._send(  # noqa: SLF001
-                        unit, bytes(unit.unitType.stateLength), _operation.OpCode.SetState
+                        unit,
+                        bytes(unit.unitType.stateLength),
+                        _operation.OpCode.SetState,
                     )
                 except ProtocolError as err:
                     if "Classic networks" not in str(err):

@@ -32,7 +32,10 @@ def _is_cover_unit(unit: Unit) -> bool:
     a DIMMER control (position feedback).
     """
     controls = {c.type for c in unit.unitType.controls}
-    return unit.unitType.mode.startswith("EXT/1ch/Dim") and UnitControlType.DIMMER in controls
+    return (
+        unit.unitType.mode.startswith("EXT/1ch/Dim")
+        and UnitControlType.DIMMER in controls
+    )
 
 
 async def async_setup_entry(

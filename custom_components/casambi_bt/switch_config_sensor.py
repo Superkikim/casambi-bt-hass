@@ -46,8 +46,13 @@ def _is_switch_unit(unit: Unit) -> bool:
     # Check model name
     model_lower = unit.unitType.model.lower()
     switch_keywords = {
-        "switch", "xpress", "button", "pushbutton",
-        "batteryswitch", "wall switch", "remote"
+        "switch",
+        "xpress",
+        "button",
+        "pushbutton",
+        "batteryswitch",
+        "wall switch",
+        "remote",
     }
     if any(keyword in model_lower for keyword in switch_keywords):
         return True
@@ -90,7 +95,7 @@ def _get_button_configs(unit_data: dict | None) -> list[dict[str, Any]]:
         ("pushButton", 1),
         ("pushButton2", 2),
         ("pushButton3", 3),
-        ("pushButton4", 4)
+        ("pushButton4", 4),
     ]
     for field_name, button_index in button_fields:
         if field_name in unit_data:
@@ -117,9 +122,7 @@ def _get_button_configs(unit_data: dict | None) -> list[dict[str, Any]]:
 
 
 def _resolve_target_name(
-    raw_network_data: dict | None,
-    action: int,
-    target: int
+    raw_network_data: dict | None, action: int, target: int
 ) -> str:
     """Resolve target ID to a name based on action type."""
     if not raw_network_data:
@@ -169,15 +172,14 @@ async def async_setup_entry(
     # Get all switch units
     switch_units = [unit for unit in casa_api.casa.units if _is_switch_unit(unit)]
 
-    _LOGGER.info("Creating switch configuration sensors for %d switch units", len(switch_units))
+    _LOGGER.info(
+        "Creating switch configuration sensors for %d switch units", len(switch_units)
+    )
 
     sensor_entities = []
     for unit in switch_units:
         # Get complete unit data
-        unit_data = _get_unit_data(
-            casa_api.casa.rawNetworkData,
-            unit.deviceId
-        )
+        unit_data = _get_unit_data(casa_api.casa.rawNetworkData, unit.deviceId)
 
         if unit_data:
             # Get button configurations
@@ -188,21 +190,24 @@ async def async_setup_entry(
                 # Find config for this button index
                 button_config = next(
                     (b for b in button_configs if b.get("index") == button_num),
-                    {"index": button_num, "type": 5, "unitID": 0}  # Default: Not configured
+                    {
+                        "index": button_num,
+                        "type": 5,
+                        "unitID": 0,
+                    },  # Default: Not configured
                 )
                 sensor_entities.append(
-                    CasambiButtonActionSensor(
-                        casa_api, unit, button_num, button_config
-                    )
+                    CasambiButtonActionSensor(casa_api, unit, button_num, button_config)
                 )
 
             # Check if there are buttons 5-8 configured
             for button_num in range(5, 9):
                 button_config = next(
-                    (b for b in button_configs if b.get("index") == button_num),
-                    None
+                    (b for b in button_configs if b.get("index") == button_num), None
                 )
-                if button_config and button_config.get("type", 5) != 5:  # 5 = Not configured
+                if (
+                    button_config and button_config.get("type", 5) != 5
+                ):  # 5 = Not configured
                     sensor_entities.append(
                         CasambiButtonActionSensor(
                             casa_api, unit, button_num, button_config
@@ -233,7 +238,7 @@ class CasambiButtonActionSensor(SensorEntity):
         api: CasambiApi,
         unit: Unit,
         button_number: int,
-        button_config: dict[str, Any]
+        button_config: dict[str, Any],
     ) -> None:
         """Initialize the button action sensor."""
         self._api = api
@@ -244,7 +249,9 @@ class CasambiButtonActionSensor(SensorEntity):
         # Set entity attributes
         self._attr_has_entity_name = True
         self._attr_name = f"Button {button_number} Action"
-        self._attr_unique_id = f"{api.casa.networkId}-unit-{unit.uuid}-button-{button_number}"
+        self._attr_unique_id = (
+            f"{api.casa.networkId}-unit-{unit.uuid}-button-{button_number}"
+        )
         self._attr_icon = "mdi:button-cursor"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
@@ -275,9 +282,7 @@ class CasambiButtonActionSensor(SensorEntity):
         if action_type in [3, 4, 9]:  # All units actions
             return action_text
         target_name = _resolve_target_name(
-            self._api.casa.rawNetworkData,
-            action_type,
-            target
+            self._api.casa.rawNetworkData, action_type, target
         )
         if target_name:
             return f"{action_text}: {target_name}"
@@ -295,19 +300,14 @@ class CasambiButtonActionSensor(SensorEntity):
             "action_type": action_type,
             "action_name": BUTTON_ACTIONS.get(action_type),
             "target_id": target,
-            "raw_config": self._button_config
+            "raw_config": self._button_config,
         }
 
 
 class CasambiSwitchRawConfigSensor(SensorEntity):
     """Sensor showing raw switch configuration for a unit."""
 
-    def __init__(
-        self,
-        api: CasambiApi,
-        unit: Unit,
-        unit_data: dict[str, Any]
-    ) -> None:
+    def __init__(self, api: CasambiApi, unit: Unit, unit_data: dict[str, Any]) -> None:
         """Initialize the raw config sensor."""
         self._api = api
         self._unit = unit
@@ -359,9 +359,8 @@ class CasambiSwitchRawConfigSensor(SensorEntity):
             "raw_switch_config": switch_fields,
             "button_configs": self._button_configs,
             "configured_buttons": sum(
-                1 for b in self._button_configs
-                if b.get("type", 5) != 5
-            )
+                1 for b in self._button_configs if b.get("type", 5) != 5
+            ),
         }
 
 
@@ -369,10 +368,7 @@ class CasambiSwitchSettingsSensor(SensorEntity):
     """Sensor showing switch settings in readable format."""
 
     def __init__(
-        self,
-        api: CasambiApi,
-        unit: Unit,
-        switch_config: dict[str, Any]
+        self, api: CasambiApi, unit: Unit, switch_config: dict[str, Any]
     ) -> None:
         """Initialize the settings sensor."""
         self._api = api
@@ -419,5 +415,5 @@ class CasambiSwitchSettingsSensor(SensorEntity):
             "long_press_all_off": self._switch_config.get("longPressAllOff", False),
             "toggle_disabled": self._switch_config.get("toggleDisabled", False),
             "exclusive_scenes": self._switch_config.get("exclusiveScenes", False),
-            "parameters": self._switch_config.get("parameters", {})
+            "parameters": self._switch_config.get("parameters", {}),
         }

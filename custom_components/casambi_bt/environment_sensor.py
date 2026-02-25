@@ -43,7 +43,7 @@ _accumulated: dict[str, dict[int, int]] = {}
 # Rain and PIR are binary (0/1) → no state_class (no graph needed).
 # Wind and solar are continuous measurements → MEASUREMENT enables HA history graph.
 _SENSOR_SPECS: list[tuple[str, str, int, SensorStateClass | None]] = [
-    ("Pluie",            "mdi:weather-rainy",    1, SensorStateClass.MEASUREMENT),  # type 0: raw value (1=sec, 5=pluie à confirmer)
+    ("Pluie",            "mdi:weather-rainy",    1, SensorStateClass.MEASUREMENT),  # type 0: raw value (1=sec, 5=pluie — confirmed)
     ("Vent",             "mdi:weather-windy",    4, SensorStateClass.MEASUREMENT),  # type 1: raw/4 = vitesse
     ("Ensoleillement",   "mdi:weather-sunny",    4, SensorStateClass.MEASUREMENT),  # type 2: raw/4 = valeur app (68/4=17 ✓)
     ("Présence (PIR)",   "mdi:motion-sensor",    1, None),                          # type 3: 0=absent, 1=présent

@@ -62,12 +62,13 @@ async def async_setup_entry(
     """Create the Casambi light entities."""
     casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
 
-    # Exclude all EXT/ mode units (covers AND sensors like Sensor Platform V4)
-    # EXT/ units are externally driven actuators or sensors, never true lights.
+    # Exclude EXT/1ch/Dim units (motor-driven covers — blinds, shutters).
+    # Other EXT/ variants (e.g. sensor platforms) have no standard light controls
+    # and are naturally excluded by get_units(CASA_LIGHT_CTRL_TYPES).
     light_entities: list[CasambiLight] = [
         CasambiLightUnit(casa_api, u)
         for u in casa_api.get_units(CASA_LIGHT_CTRL_TYPES)
-        if not u.unitType.mode.startswith("EXT/")
+        if not u.unitType.mode.startswith("EXT/1ch/Dim")
     ]
 
     group_entities: list[CasambiLight] = []

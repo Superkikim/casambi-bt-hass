@@ -1,4 +1,4 @@
-"""White/Color balance number entity for Casambi PWM+RGB+TW light units.
+"""White/Color balance helpers for Casambi PWM+RGB+TW light units.
 
 The WHITECOLORBALANCE control is a 6-bit value not yet decoded by
 casambi-bt-revamped (mapped to UnitControlType.UNKOWN=99).
@@ -9,45 +9,40 @@ Raw encoding — state byte layout (5 bytes):
     MM = balance byte  = (tint_offset & 0x03) | (raw << 2)
     21 = device constant (do not modify)
 
-  raw ∈ [0..63]  (64 discrete steps — not percentages)
+  raw ∈ [0..63]  (64 discrete steps)
   tint_offset = MM & 0x03  (lower 2 bits; preserves TT context)
   raw         = (MM >> 2) & 0x3F  ← what _read_bits(state, offset=26, length=6) extracts
 
 Calibrated bi-linear model (Casambi Sensor Platform / Véranda LED type 19803):
-  raw  0      →  Blanc=100%  Couleur=  0%  (Casambi app "100% / 0%")
-  raw  0-31   →  Blanc=100% fixed,  Couleur = raw/31 × 100%
-  raw 31      →  Blanc=100%  Couleur=100%  (factory default — both channels max)
-  raw 31-63   →  Couleur=100% fixed, Blanc = (63-raw)/32 × 100%
-  raw 63      →  Blanc=  0%  Couleur=100%  (Casambi app "0% / 100%")
+  raw  0      →  White=100%  Color=  0%
+  raw  0-31   →  White=100% fixed,  Color = raw/31 × 100%
+  raw 31      →  White=100%  Color=100%  (factory default — both channels max)
+  raw 31-63   →  Color=100% fixed, White = (63-raw)/32 × 100%
+  raw 63      →  White=  0%  Color=100%
 
-HA entity display (0-100%):
-  100% = raw  0 = pure Blanc   (Blanc 100%, Couleur   0%)
-    0% = raw 63 = pure Couleur (Blanc   0%, Couleur 100%)
-  ~50% = raw 31 = centre       (Blanc 100%, Couleur 100% — both maxed)
+HA attribute white_balance (0-100%):
+  100% = raw  0 = pure White
+    0% = raw 63 = pure Color
+  ~50% = raw 31 = centre (both channels maxed)
 
 Formula:
-  READ : HA% = round((63 - raw) × 100 / 63)
-  WRITE: raw = round((100 - HA%) × 63 / 100)  clamped to [0, 63]
+  READ : white_balance% = round((63 - raw) × 100 / 63)
+  WRITE: raw = round((100 - white_balance%) × 63 / 100)  clamped to [0, 63]
 
 Detection: unit must have both a UnitControlType.RGB control and a
 UnitControlType.UNKOWN control with length=6 and default=31.
+
+These helpers are used by light.py (attribute + set method) and __init__.py
+(set_white_balance service handler). No HA entity is created from this module.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any, cast
 
 from CasambiBt import Unit, UnitControlType
 
-from homeassistant.components.number import NumberEntity, NumberMode
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-
 from . import CasambiApi
-from .const import DOMAIN
-from .entities import CasambiUnitEntity, TypedEntityDescription
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -110,89 +105,3 @@ async def _send_raw_state(api: CasambiApi, unit: Unit, raw: bytearray) -> None:
     from CasambiBt._operation import OpCode  # private but stable  # noqa: PLC0415
 
     await api.casa._send(unit, bytes(raw), OpCode.SetState)  # noqa: SLF001
-
-
-# ── Platform setup ────────────────────────────────────────────────────────────
-
-
-async def async_setup_entry_number_white_color_balance(
-    hass: HomeAssistant,
-    config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
-    """Create White/Color balance number entities for units that support it."""
-    casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
-
-    entities: list[CasambiWhiteColorBalance] = []
-    for unit in casa_api.get_units():
-        if not _is_white_color_balance_unit(unit):
-            continue
-        entities.append(CasambiWhiteColorBalance(casa_api, unit))
-
-    _LOGGER.info("Creating %d White/Color balance entities", len(entities))
-    if entities:
-        async_add_entities(entities)
-
-
-# ── Entity class ──────────────────────────────────────────────────────────────
-
-
-class CasambiWhiteColorBalance(CasambiUnitEntity, NumberEntity):
-    """HA number entity for the WHITECOLORBALANCE cross-fade slider.
-
-    HA 100% = raw  0 = Blanc 100% / Couleur   0%
-    HA  ~50% = raw 31 = Blanc 100% / Couleur 100% (factory default)
-    HA   0% = raw 63 = Blanc   0% / Couleur 100%
-    """
-
-    def __init__(self, api: CasambiApi, unit: Unit) -> None:
-        """Initialize a White/Color balance entity for the given unit."""
-        ctrl = _find_wcb_control(unit)
-        self._ctrl_offset: int = ctrl.offset
-        self._ctrl_length: int = ctrl.length
-        desc = TypedEntityDescription(
-            key=unit.uuid,
-            name="Balance des blancs",
-            entity_type="white-color-balance",
-        )
-        super().__init__(api, desc, unit)
-        self._attr_icon = "mdi:palette"
-        self._attr_native_min_value = 0.0
-        self._attr_native_max_value = 100.0
-        self._attr_native_step = 1.0
-        self._attr_mode = NumberMode.SLIDER
-        self._attr_native_unit_of_measurement = "%"
-
-    @property
-    def native_value(self) -> float | None:
-        """Return the current balance as % (linear: 0%=raw63=Couleur, 100%=raw0=Blanc)."""
-        unit = cast("Unit", self._obj)
-        if unit.state is None or unit.state.raw_state is None:
-            return None
-        raw_val = _read_bits(unit.state.raw_state, self._ctrl_offset, self._ctrl_length)
-        return round((_WCB_RAW_MAX - raw_val) * 100 / _WCB_RAW_MAX)
-
-    async def async_set_native_value(self, value: float) -> None:
-        """Set the balance from a percentage (linear: 0%→raw63, 100%→raw0)."""
-        unit = cast("Unit", self._obj)
-        if unit.state is None or unit.state.raw_state is None:
-            return
-        raw_val = max(
-            0, min(_WCB_RAW_MAX, round(_WCB_RAW_MAX - value * _WCB_RAW_MAX / 100))
-        )
-        raw = bytearray(unit.state.raw_state)
-        _write_bits(raw, self._ctrl_offset, self._ctrl_length, raw_val)
-        await _send_raw_state(self._api, unit, raw)
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Expose raw WCB bits for calibration (see wcb_calibrate.py)."""
-        unit = cast("Unit", self._obj)
-        if unit.state is None or unit.state.raw_state is None:
-            return {}
-        raw = unit.state.raw_state
-        wcb_raw = _read_bits(raw, self._ctrl_offset, self._ctrl_length)
-        return {
-            "wcb_raw": wcb_raw,
-            "raw_state_hex": raw.hex(),
-        }

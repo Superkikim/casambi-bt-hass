@@ -497,6 +497,32 @@ async def async_setup_services(hass: HomeAssistant) -> None:  # noqa: C901
         )
         _LOGGER.info("Registered dump_classic_diagnostics service")
 
+    if not hass.services.has_service(DOMAIN, "set_white_balance"):
+
+        async def handle_set_white_balance(call: ServiceCall) -> None:
+            """Handle the set_white_balance service call."""
+            from homeassistant.helpers.entity_platform import async_get_platforms  # noqa: I001, PLC0415
+            from .light import CasambiLightUnit  # noqa: PLC0415
+
+            entity_ids: list[str] = call.data["entity_id"]
+            value: float = call.data["value"]
+            for platform in async_get_platforms(hass, DOMAIN):
+                if platform.domain != "light":
+                    continue
+                for entity in platform.entities.values():
+                    if (
+                        entity.entity_id in entity_ids
+                        and isinstance(entity, CasambiLightUnit)
+                    ):
+                        await entity.async_set_white_balance(value)
+
+        hass.services.async_register(
+            DOMAIN,
+            "set_white_balance",
+            handle_set_white_balance,
+        )
+        _LOGGER.info("Registered set_white_balance service")
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""

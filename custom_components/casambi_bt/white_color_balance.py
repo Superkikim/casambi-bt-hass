@@ -152,7 +152,7 @@ class CasambiWhiteColorBalance(CasambiUnitEntity, NumberEntity):
         self._ctrl_length: int = ctrl.length
         desc = TypedEntityDescription(
             key=unit.uuid,
-            name="Blanc / Couleur",
+            name="Balance des blancs",
             entity_type="white-color-balance",
         )
         super().__init__(api, desc, unit)

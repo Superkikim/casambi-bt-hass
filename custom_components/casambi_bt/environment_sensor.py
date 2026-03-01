@@ -51,7 +51,7 @@ _NUMERIC_SPECS: dict[int, tuple[str, str, int]] = {
 
 # Binary sensors: sensor_index → (translation_key, icon, device_class, on_threshold)
 _BINARY_SPECS: dict[int, tuple[str, str, BinarySensorDeviceClass, int]] = {
-    0: ("rain", "mdi:weather-rainy", BinarySensorDeviceClass.PRECIPITATION, 2),
+    0: ("rain", "mdi:weather-rainy", BinarySensorDeviceClass.MOISTURE, 2),
     3: ("pir",  "mdi:motion-sensor", BinarySensorDeviceClass.MOTION,        1),
 }
 
@@ -201,7 +201,40 @@ class CasambiEnvironmentSensor(CasambiUnitEntity, SensorEntity):
         self._sensor_index = sensor_index
         self._divisor = divisor
         self._attr_icon = icon
-        self._attr_state_class = SensorStateClass.MEASUREMENT
+
+    # TypedEntityDescription extends EntityDescription, not SensorEntityDescription,
+    # so HA's SensorEntity cached_properties would fail reading state_class etc.
+    # Override them explicitly to prevent AttributeError.
+
+    @property
+    def state_class(self):
+        """Return MEASUREMENT state class for continuous sensor."""
+        return SensorStateClass.MEASUREMENT
+
+    @property
+    def options(self):
+        """Return None (no fixed option list)."""
+        return None
+
+    @property
+    def last_reset(self):
+        """Return None (current measurement, no accumulated total)."""
+        return None
+
+    @property
+    def native_unit_of_measurement(self):
+        """Return None (raw dimensionless values)."""
+        return None
+
+    @property
+    def suggested_display_precision(self):
+        """Return None (use default precision)."""
+        return None
+
+    @property
+    def suggested_unit_of_measurement(self):
+        """Return None (no conversion suggested)."""
+        return None
 
     @property
     def native_value(self) -> int | None:

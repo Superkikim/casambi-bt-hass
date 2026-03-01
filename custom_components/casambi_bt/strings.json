@@ -1,4 +1,11 @@
 {
+  "entity": {
+    "number": {
+      "white_balance": {
+        "name": "White balance"
+      }
+    }
+  },
   "config": {
     "step": {
       "user": {

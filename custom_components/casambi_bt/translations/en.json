@@ -1,4 +1,11 @@
 {
+    "entity": {
+        "number": {
+            "white_balance": {
+                "name": "White balance"
+            }
+        }
+    },
     "config": {
         "abort": {
             "already_configured": "Device is already configured",

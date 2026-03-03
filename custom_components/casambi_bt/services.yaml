@@ -143,3 +143,27 @@ dump_classic_diagnostics:
       default: false
       selector:
         boolean:
+
+set_white_balance:
+  name: Set White Balance
+  description: Set the white/color balance on a Casambi RGB+TW light unit (100% = pure white, 0% = pure color).
+  fields:
+    entity_id:
+      name: Entity
+      description: The Casambi light entity to adjust.
+      required: true
+      example: light.etoiles_pergola
+      selector:
+        entity:
+          domain: light
+          integration: casambi_bt
+    value:
+      name: White balance (%)
+      description: White balance percentage. 100 = pure white, 0 = pure color.
+      required: true
+      example: 75
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"

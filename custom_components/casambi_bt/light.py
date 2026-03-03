@@ -32,6 +32,13 @@ from .entities import (
     CasambiUnitEntity,
     TypedEntityDescription,
 )
+from .white_color_balance import (
+    _WCB_RAW_MAX,
+    _find_wcb_control,
+    _read_bits,
+    _send_raw_state,
+    _write_bits,
+)
 
 CASA_LIGHT_CTRL_TYPES: Final[list[UnitControlType]] = [
     UnitControlType.DIMMER,
@@ -62,12 +69,13 @@ async def async_setup_entry(
     """Create the Casambi light entities."""
     casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
 
-    # Exclude all EXT/ mode units (covers AND sensors like Sensor Platform V4)
-    # EXT/ units are externally driven actuators or sensors, never true lights.
+    # Exclude EXT/1ch/Dim units (motor-driven covers — blinds, shutters).
+    # Other EXT/ variants (e.g. sensor platforms) have no standard light controls
+    # and are naturally excluded by get_units(CASA_LIGHT_CTRL_TYPES).
     light_entities: list[CasambiLight] = [
         CasambiLightUnit(casa_api, u)
         for u in casa_api.get_units(CASA_LIGHT_CTRL_TYPES)
-        if not u.unitType.mode.startswith("EXT/")
+        if not u.unitType.mode.startswith("EXT/1ch/Dim")
     ]
 
     group_entities: list[CasambiLight] = []
@@ -152,6 +160,10 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
             self._attr_min_color_temp_kelvin = temp_control.min
             self._attr_max_color_temp_kelvin = temp_control.max
 
+        ctrl = _find_wcb_control(unit)
+        self._wcb_offset: int | None = ctrl.offset if ctrl else None
+        self._wcb_length: int | None = ctrl.length if ctrl else None
+
         desc = TypedEntityDescription(key=unit.uuid, name=None, entity_type="light")
 
         self._obj: Unit
@@ -206,6 +218,27 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
             return unit.state.xy
         return None
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return white_balance (0-100%) for RGB+TW units that have a WCB control."""
+        if self._wcb_offset is None:
+            return {}
+        unit = cast("Unit", self._obj)
+        if unit.state is None or unit.state.raw_state is None:
+            return {}
+        raw_val = _read_bits(unit.state.raw_state, self._wcb_offset, self._wcb_length)
+        return {"white_balance": round((_WCB_RAW_MAX - raw_val) * 100 / _WCB_RAW_MAX)}
+
+    async def async_set_white_balance(self, value: float) -> None:
+        """Set the white balance (0-100%) by writing WCB bits to raw state."""
+        unit = cast("Unit", self._obj)
+        if unit.state is None or unit.state.raw_state is None or self._wcb_offset is None:
+            return
+        raw_val = max(0, min(_WCB_RAW_MAX, round(_WCB_RAW_MAX - value * _WCB_RAW_MAX / 100)))
+        raw = bytearray(unit.state.raw_state)
+        _write_bits(raw, self._wcb_offset, self._wcb_length, raw_val)
+        await _send_raw_state(self._api, unit, raw)
+
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the unit."""
         unit = cast("Unit", self._obj)
@@ -241,12 +274,13 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
         if set_state:
             try:
                 await self._api.casa.setUnitState(unit, state)
-                return
             except ProtocolError as err:
                 # Classic networks don't support EVO INVOCATION packets for SetState.
                 # Fall back to individual operations supported by Classic.
                 if not (self._api.is_classic_network or "Classic networks" in str(err)):
                     raise
+            else:
+                return
 
             desired_brightness = kwargs.get(ATTR_BRIGHTNESS)
             current_brightness = (
@@ -269,13 +303,27 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
                 None if white_ctrl is None else white_ctrl.length,
                 None if temp_ctrl is None else temp_ctrl.length,
                 None if colorsource_ctrl is None else colorsource_ctrl.length,
-                {k: v for k, v in kwargs.items() if k in {ATTR_BRIGHTNESS, ATTR_RGB_COLOR, ATTR_RGBW_COLOR, ATTR_COLOR_TEMP_KELVIN, ATTR_XY_COLOR}},
+                {
+                    k: v
+                    for k, v in kwargs.items()
+                    if k
+                    in {
+                        ATTR_BRIGHTNESS,
+                        ATTR_RGB_COLOR,
+                        ATTR_RGBW_COLOR,
+                        ATTR_COLOR_TEMP_KELVIN,
+                        ATTR_XY_COLOR,
+                    }
+                },
             )
 
             was_set = False
             sent_level = False
             if ATTR_BRIGHTNESS in kwargs:
-                if current_brightness is None or desired_brightness != current_brightness:
+                if (
+                    current_brightness is None
+                    or desired_brightness != current_brightness
+                ):
                     _LOGGER.debug(
                         "Classic fallback: setLevel unit=%i desired=%s current=%s",
                         unit.deviceId,
@@ -334,8 +382,10 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
                     await self._api.casa.turnOn(self._obj)
                 else:
                     await self._api.casa.setLevel(unit, 0)
-            elif not was_on_before and not sent_level and (
-                desired_brightness is None or desired_brightness > 0
+            elif (
+                not was_on_before
+                and not sent_level
+                and (desired_brightness is None or desired_brightness > 0)
             ):
                 # Ensure the unit turns on when setting non-dimmer attributes while it was off,
                 # even if HA included brightness in kwargs but it didn't actually change.
@@ -355,7 +405,9 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
                 unit = cast("Unit", self._obj)
                 try:
                     await self._api.casa._send(  # noqa: SLF001
-                        unit, bytes(unit.unitType.stateLength), _operation.OpCode.SetState
+                        unit,
+                        bytes(unit.unitType.stateLength),
+                        _operation.OpCode.SetState,
                     )
                 except ProtocolError as err:
                     if "Classic networks" not in str(err):

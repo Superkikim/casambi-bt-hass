@@ -9,20 +9,16 @@ import json
 import logging
 from pathlib import Path
 from typing import Final
-import yaml
 
 from CasambiBt import Casambi, Group, Scene, Unit, UnitControlType
 from CasambiBt.errors import AuthenticationError, BluetoothError, NetworkNotFoundError
+import yaml
 
 from homeassistant.components import bluetooth
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, CONF_PASSWORD
 from homeassistant.core import HomeAssistant, ServiceCall, callback
-from homeassistant.exceptions import (
-    ConfigEntryAuthFailed,
-    ConfigEntryError,
-    ConfigEntryNotReady,
-)
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import DOMAIN, PLATFORMS
@@ -42,11 +38,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Help testers verify the installed library build quickly.
     try:
-        import CasambiBt as _casambi_pkg  # local import for path logging + version
+        import CasambiBt as _casambi_pkg  # noqa: PLC0415  # local import for path logging + version
 
         lib_ver = getattr(_casambi_pkg, "__version__", "unknown")
         lib_path = getattr(_casambi_pkg, "__file__", "unknown")
-    except Exception:
+    except Exception:  # noqa: BLE001
         lib_ver = "unknown"
         lib_path = "unknown"
     _LOGGER.info("Using casambi-bt-revamped=%s (%s)", lib_ver, lib_path)
@@ -75,13 +71,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # The library provides ASCII-hex bytes for raw_packet/decrypted_data/payload_hex.
         # Convert bytes -> str via ASCII decode directly (not .hex()).
         raw_packet_str = (
-            raw_packet.decode("ascii") if isinstance(raw_packet, (bytes, bytearray)) else raw_packet
+            raw_packet.decode("ascii")
+            if isinstance(raw_packet, (bytes, bytearray))
+            else raw_packet
         )
         decrypted_data_str = (
-            decrypted_data.decode("ascii") if isinstance(decrypted_data, (bytes, bytearray)) else decrypted_data
+            decrypted_data.decode("ascii")
+            if isinstance(decrypted_data, (bytes, bytearray))
+            else decrypted_data
         )
         payload_hex_str = (
-            payload_hex.decode("ascii") if isinstance(payload_hex, (bytes, bytearray)) else payload_hex
+            payload_hex.decode("ascii")
+            if isinstance(payload_hex, (bytes, bytearray))
+            else payload_hex
         )
 
         unit_id = event.get("unit_id")
@@ -129,8 +131,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "decrypted_data": decrypted_data_str,
                 "message_position": event.get("message_position"),
                 "payload_hex": payload_hex_str,
-                "extra_data": extra_data.hex() if isinstance(extra_data, bytes) else extra_data,
-            }
+                "extra_data": extra_data.hex()
+                if isinstance(extra_data, bytes)
+                else extra_data,
+            },
         )
 
     # Register switch event handler that fires Home Assistant events
@@ -139,9 +143,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _emit_event(event_data)
 
     # Register the event handler if the library supports it
-    if hasattr(api.casa, 'registerSwitchEventHandler'):
+    if hasattr(api.casa, "registerSwitchEventHandler"):
         api.register_switch_event_callback(handle_switch_event)
-        _LOGGER.info("Switch event handler registered - events will fire as casambi_bt_switch_event")
+        _LOGGER.info(
+            "Switch event handler registered - events will fire as casambi_bt_switch_event"
+        )
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = api
 
@@ -153,43 +159,44 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_setup_services(hass: HomeAssistant) -> None:
+async def async_setup_services(hass: HomeAssistant) -> None:  # noqa: C901
     """Set up services for the Casambi integration."""
-    
+
     # Register get_network_config service if not already registered
     if not hass.services.has_service(DOMAIN, "get_network_config"):
+
         async def handle_get_network_config(call: ServiceCall) -> dict:
             """Handle the get_network_config service call."""
             unit_id = call.data.get("unit_id")
             output_format = call.data.get("format", "json")
-            
+
             # Get the first configured entry (could be enhanced to support multiple)
             entries = hass.config_entries.async_entries(DOMAIN)
             if not entries:
                 raise ValueError("No Casambi integration configured")
-            
+
             entry = entries[0]
             casa_api: CasambiApi = hass.data[DOMAIN][entry.entry_id]
-            
+
             # Get the raw network data
             raw_data = casa_api.casa.rawNetworkData
             if not raw_data:
                 raise ValueError("No network data available")
-            
+
             # If unit_id is specified, extract just that unit's data
             if unit_id is not None:
                 network = raw_data.get("network", {})
                 units = network.get("units", [])
-                
+
                 unit_data = None
                 for unit in units:
                     if unit.get("deviceID") == unit_id:
                         unit_data = unit
                         break
-                
+
                 if not unit_data:
                     raise ValueError(f"Unit with ID {unit_id} not found")
-                
+
                 result_data = {
                     "unit": unit_data,
                     "network_id": casa_api.casa.networkId,
@@ -198,13 +205,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             else:
                 # Return full network config
                 result_data = raw_data
-            
+
             # Format the output
             if output_format == "yaml":
                 return {"config": yaml.dump(result_data, default_flow_style=False)}
-            else:
-                return {"config": json.dumps(result_data, indent=2)}
-        
+            return {"config": json.dumps(result_data, indent=2)}
+
         # Register the service
         hass.services.async_register(
             DOMAIN,
@@ -213,25 +219,26 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             supports_response="only",
         )
         _LOGGER.info("Registered get_network_config service")
-    
+
     # Register update_button_config service if not already registered
     if not hass.services.has_service(DOMAIN, "update_button_config"):
+
         async def handle_update_button_config(call: ServiceCall) -> None:
             """Handle the update_button_config service call."""
             unit_id = call.data.get("unit_id")
             button_index = call.data.get("button_index")
             action_type = call.data.get("action_type")
             target_unit_id = call.data.get("target_unit_id")
-            
+
             # Get the first available CasambiApi instance
             casa_api = None
             for entry_id in hass.data.get(DOMAIN, {}):
                 casa_api = hass.data[DOMAIN][entry_id]
                 break
-            
+
             if not casa_api:
                 raise ValueError("No Casambi connection available")
-            
+
             # Update cached button config in library
             await casa_api.casa.update_button_config(
                 unit_id=unit_id,
@@ -251,11 +258,14 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             # Immediately apply the switchConfig to the device (auto method)
             try:
                 # Fast path: try SetParameter first with default tag 1
-                await casa_api.casa.apply_switch_config_ble(unit_id=unit_id, parameter_tag=1)
-                _LOGGER.info(
-                    "Applied switchConfig via SetParameter after update (unit=%s, tag=1)", unit_id
+                await casa_api.casa.apply_switch_config_ble(
+                    unit_id=unit_id, parameter_tag=1
                 )
-            except Exception as e:
+                _LOGGER.info(
+                    "Applied switchConfig via SetParameter after update (unit=%s, tag=1)",
+                    unit_id,
+                )
+            except Exception as e:  # noqa: BLE001
                 _LOGGER.info(
                     "SetParameter apply failed for unit %s after update (%s). Falling back to ExtPacket.",
                     unit_id,
@@ -265,7 +275,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 _LOGGER.info(
                     "Applied switchConfig via ExtPacket after update (unit=%s)", unit_id
                 )
-    
+
         # Register the update_button_config service
         hass.services.async_register(
             DOMAIN,
@@ -276,6 +286,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     # Register apply_switch_config service if not already registered
     if not hass.services.has_service(DOMAIN, "apply_switch_config"):
+
         async def handle_apply_switch_config(call: ServiceCall) -> None:
             """Handle the apply_switch_config service call."""
             unit_id = call.data.get("unit_id")
@@ -292,24 +303,30 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
             if method == "set_parameter":
                 tag = 1 if parameter_tag is None else int(parameter_tag)
-                await casa_api.casa.apply_switch_config_ble(unit_id=unit_id, parameter_tag=tag)
+                await casa_api.casa.apply_switch_config_ble(
+                    unit_id=unit_id, parameter_tag=tag
+                )
                 _LOGGER.info(
-                    "Applied switchConfig via SetParameter (unit=%s, tag=%s)", unit_id, tag
+                    "Applied switchConfig via SetParameter (unit=%s, tag=%s)",
+                    unit_id,
+                    tag,
                 )
             elif method == "ext":
                 await casa_api.casa.apply_switch_config_ble_large(unit_id=unit_id)
-                _LOGGER.info(
-                    "Applied switchConfig via ExtPacket (unit=%s)", unit_id
-                )
+                _LOGGER.info("Applied switchConfig via ExtPacket (unit=%s)", unit_id)
             else:
                 # Auto: try SetParameter first, fall back to ExtPacket on size error
                 try:
                     tag = 1 if parameter_tag is None else int(parameter_tag)
-                    await casa_api.casa.apply_switch_config_ble(unit_id=unit_id, parameter_tag=tag)
-                    _LOGGER.info(
-                        "Applied switchConfig via SetParameter (unit=%s, tag=%s)", unit_id, tag
+                    await casa_api.casa.apply_switch_config_ble(
+                        unit_id=unit_id, parameter_tag=tag
                     )
-                except Exception as e:
+                    _LOGGER.info(
+                        "Applied switchConfig via SetParameter (unit=%s, tag=%s)",
+                        unit_id,
+                        tag,
+                    )
+                except Exception as e:  # noqa: BLE001
                     # Fallback to ext method on size or protocol error
                     _LOGGER.info(
                         "SetParameter failed for unit %s (%s). Falling back to ExtPacket.",
@@ -331,6 +348,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     # Register dump_classic_diagnostics service if not already registered
     if not hass.services.has_service(DOMAIN, "dump_classic_diagnostics"):
+
         async def handle_dump_classic_diagnostics(call: ServiceCall) -> dict:
             """Log Classic protocol diagnostics (safe for sharing).
 
@@ -361,7 +379,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 protocol_mode_name = getattr(protocol_mode, "name", None)
 
                 conn_hash8 = getattr(client, "_classicConnHash8", None)
-                conn_hash8_hex = conn_hash8.hex() if isinstance(conn_hash8, (bytes, bytearray)) else None
+                conn_hash8_hex = (
+                    conn_hash8.hex()
+                    if isinstance(conn_hash8, (bytes, bytearray))
+                    else None
+                )
 
                 notify_uuids = getattr(client, "_classicNotifyCharUuids", None)
                 if isinstance(notify_uuids, set):
@@ -372,7 +394,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 if client is not None and hasattr(client, "getClassicDiagnostics"):
                     try:
                         client_diag = client.getClassicDiagnostics()
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         client_diag = {"error": str(e)}
 
                 diag = {
@@ -388,9 +410,15 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     "classic_tx_uuid": getattr(client, "_classicTxCharUuid", None),
                     "classic_notify_uuids": notify_uuids,
                     "classic_conn_hash8_hex": conn_hash8_hex,
-                    "classic_visitorKey_present": bool(getattr(network, "classicVisitorKey", lambda: None)()),
-                    "classic_managerKey_present": bool(getattr(network, "classicManagerKey", lambda: None)()),
-                    "cloud_session_is_manager": bool(getattr(network, "isManager", lambda: False)()),
+                    "classic_visitorKey_present": bool(
+                        getattr(network, "classicVisitorKey", lambda: None)()
+                    ),
+                    "classic_managerKey_present": bool(
+                        getattr(network, "classicManagerKey", lambda: None)()
+                    ),
+                    "cloud_session_is_manager": bool(
+                        getattr(network, "isManager", lambda: False)()
+                    ),
                     "classic_rx_stats": {
                         "frames": getattr(client, "_classicRxFrames", None),
                         "verified": getattr(client, "_classicRxVerified", None),
@@ -414,8 +442,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
                 # Include packet history if requested
                 if include_packet_history:
-                    diag["classic_tx_history"] = client_diag.get("classic_tx_history", [])
-                    diag["classic_rx_history"] = client_diag.get("classic_rx_history", [])
+                    diag["classic_tx_history"] = client_diag.get(
+                        "classic_tx_history", []
+                    )
+                    diag["classic_rx_history"] = client_diag.get(
+                        "classic_rx_history", []
+                    )
                     diag["classic_tx_count"] = client_diag.get("classic_tx_count", 0)
                     diag["classic_rx_count"] = client_diag.get("classic_rx_count", 0)
 
@@ -443,7 +475,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             if entry_id:
                 casa_api = hass.data.get(DOMAIN, {}).get(entry_id)
                 if casa_api is None:
-                    raise ValueError(f"Entry id {entry_id} not found in hass.data[{DOMAIN!r}]")
+                    raise ValueError(
+                        f"Entry id {entry_id} not found in hass.data[{DOMAIN!r}]"
+                    )
             else:
                 for _eid in hass.data.get(DOMAIN, {}):
                     casa_api = hass.data[DOMAIN][_eid]
@@ -462,6 +496,32 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             supports_response="optional",
         )
         _LOGGER.info("Registered dump_classic_diagnostics service")
+
+    if not hass.services.has_service(DOMAIN, "set_white_balance"):
+
+        async def handle_set_white_balance(call: ServiceCall) -> None:
+            """Handle the set_white_balance service call."""
+            from homeassistant.helpers.entity_platform import async_get_platforms  # noqa: I001, PLC0415
+            from .light import CasambiLightUnit  # noqa: PLC0415
+
+            entity_ids: list[str] = call.data["entity_id"]
+            value: float = call.data["value"]
+            for platform in async_get_platforms(hass, DOMAIN):
+                if platform.domain != "light":
+                    continue
+                for entity in platform.entities.values():
+                    if (
+                        entity.entity_id in entity_ids
+                        and isinstance(entity, CasambiLightUnit)
+                    ):
+                        await entity.async_set_white_balance(value)
+
+        hass.services.async_register(
+            DOMAIN,
+            "set_white_balance",
+            handle_set_white_balance,
+        )
+        _LOGGER.info("Registered set_white_balance service")
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -528,10 +588,12 @@ class CasambiApi:
             self.casa.registerUnitChangedHandler(self._unit_changed_handler)
 
             # Register switch event handler if available (new in casambi-bt 0.3.0)
-            if hasattr(self.casa, 'registerSwitchEventHandler'):
+            if hasattr(self.casa, "registerSwitchEventHandler"):
                 self.casa.registerSwitchEventHandler(self._switch_event_handler)
             else:
-                _LOGGER.warning("Switch event handler not available in casambi-bt library. Please update to latest version.")
+                _LOGGER.warning(
+                    "Switch event handler not available in casambi-bt library. Please update to latest version."
+                )
 
             await self.casa.connect(device, self.password)
             self._first_disconnect = True
@@ -557,7 +619,9 @@ class CasambiApi:
             # ConfigEntryError here or the user must reload manually every time.
             _LOGGER.warning(
                 "Transient error connecting to %s (%s: %s) — HA will retry",
-                self.address, type(err).__name__, err,
+                self.address,
+                type(err).__name__,
+                err,
             )
             raise ConfigEntryNotReady(
                 f"Unexpected error creating network {self.address}"
@@ -630,7 +694,7 @@ class CasambiApi:
             self.casa.unregisterUnitChangedHandler(self._unit_changed_handler)
 
             # Unregister switch event handler if available
-            if hasattr(self.casa, 'unregisterSwitchEventHandler'):
+            if hasattr(self.casa, "unregisterSwitchEventHandler"):
                 self.casa.unregisterSwitchEventHandler(self._switch_event_handler)
 
     @callback
@@ -718,7 +782,9 @@ class CasambiApi:
         self._switch_event_callbacks.append(callback)
         _LOGGER.debug("Registered switch event callback: %s", callback)
 
-    def unregister_switch_event_callback(self, callback: Callable[[dict], None]) -> None:
+    def unregister_switch_event_callback(
+        self, callback: Callable[[dict], None]
+    ) -> None:
         """Unregister a callback for switch events."""
         if callback in self._switch_event_callbacks:
             self._switch_event_callbacks.remove(callback)

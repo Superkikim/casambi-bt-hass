@@ -1,4 +1,17 @@
 {
+    "entity": {
+        "binary_sensor": {
+            "rain": { "name": "Rain" },
+            "pir":  { "name": "Motion" }
+        },
+        "number": {
+            "white_balance": { "name": "White balance" }
+        },
+        "sensor": {
+            "wind":  { "name": "Wind" },
+            "solar": { "name": "Solar radiation" }
+        }
+    },
     "config": {
         "abort": {
             "already_configured": "Device is already configured",

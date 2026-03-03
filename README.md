@@ -1,19 +1,28 @@
+> **Fork notice**: This is a fork of [@rankjie/casambi-bt-hass](https://github.com/rankjie/casambi-bt-hass),
+> maintained by [@Superkikim](https://github.com/Superkikim).
+> It adds Winsol blind/cover support, Sensor Platform V4 environment sensors,
+> White Color Balance control, and translations (FR, IT, DE, NL).
+> Generic improvements are submitted upstream via PR when applicable.
+
 # Casambi Bluetooth Revamped
 
 [![Discord](https://img.shields.io/discord/1186445089317326888)](https://discord.gg/jgZVugfx)
 
-An enhanced fork of the [original Casambi Bluetooth integration](https://github.com/lkempf/casambi-bt-hass) by [@lkempf](https://github.com/lkempf), with additional features for better switch, relay, cover and light support.
+An enhanced fork of the [original Casambi Bluetooth integration](https://github.com/lkempf/casambi-bt-hass) by [@lkempf](https://github.com/lkempf), with additional features for better switch, relay, cover, light and sensor support.
 
 > ⚠️ **DEVELOPMENT WARNING**: This repository is used as a development environment. Things might break at any moment. It's recommended to wait at least 1 day after a new release before updating to ensure stability. All stable changes will be merged back to the original repository.
 >
-> **When to use this fork**: Use this version if you need Classic firmware support, want to use Casambi switches in Home Assistant (usable but still being improved), or need cover/relay support. Otherwise, stick with the original integration.
+> **When to use this fork**: Use this version if you need Classic firmware support, Winsol blind/cover control, environment sensors (wind, rain, solar, PIR), or White Color Balance control. Otherwise, consider the upstream integration.
 
 ## What's Enhanced
 
 - **Classic protocol support** - Lighting fixtures on Classic (legacy) Casambi firmware networks: on/off, dimming, and live state sync from the Casambi app. More testers welcome!
 - **Switch event support** - Physical switch button press/hold/release events (wired + wireless), fired as `casambi_bt_button_event` HA events for clean automation triggers
 - **Motor-driven covers** - Blinds and shutters appear as HA cover entities with open/close/stop and position control
-- **White/Color balance slider** - RGB/TW lights expose a `Blanc / Couleur` number entity (0% = pure white, 100% = pure color)
+- **Tilt control** - Louvre-type blinds (e.g. Winsol Lamel V4.1 TA16) support tilt angle control (0–142°)
+- **White/Color balance** - RGB/TW lights with a WHITECOLORBALANCE control expose a `white_balance` attribute, a number slider, and a `set_white_balance` service
+- **Environment sensors** - Casambi Sensor Platform V4 units expose wind speed, solar radiation, rain (binary), and PIR presence (binary) as HA entities
+- **Localization** - Full translations for French (fr), Italian (it), German (de), and Dutch (nl)
 - **Automation blueprints** - Ready-to-use blueprints for button automations
 - **Fixed relay status** - Properly reports the status of relay units (also merged to the original integration)
 - **Based on casambi-bt-revamped** - Uses an enhanced version of the underlying library (protocol-level INVOCATION parsing)
@@ -49,12 +58,30 @@ Physical switches fire `casambi_bt_button_event` HA events:
 ### 🪟 Motor-Driven Covers
 Casambi `EXT/1ch/Dim` units (blinds, shutters) are exposed as HA cover entities:
 - Open, close, stop
-- Position control (0-100%)
-- Tilt angle for louvre-type blinds (where supported)
+- Position control (0–100%)
+- Tilt angle for louvre-type blinds (where supported, e.g. Winsol Lamel V4.1 TA16)
 
 ### 💡 Light Features
 - Dimmer, color (RGB), color temperature (TW), on/off
-- **White/Color balance**: RGB/TW lights with a WHITECOLORBALANCE control get a `Blanc / Couleur` slider (0% = pure white, 100% = pure color)
+- **White/Color balance**: RGB/TW lights with a WHITECOLORBALANCE control expose:
+  - A `white_balance` attribute on the light entity (0% = pure white, 100% = pure color)
+  - A number slider entity for direct control from the UI
+  - A `casambi_bt.set_white_balance` service for use in automations
+
+### 🌦 Environment Sensors (Sensor Platform V4)
+Casambi Sensor Platform V4 units expose four sensors:
+- **Wind** — numeric sensor (speed)
+- **Solar radiation** — numeric sensor
+- **Rain** — binary sensor (`device_class: moisture`)
+- **Motion (PIR)** — binary sensor (`device_class: motion`)
+
+### 🌍 Localization
+Entity names and config flow are translated for:
+- 🇬🇧 English (`en`)
+- 🇫🇷 French (`fr`)
+- 🇮🇹 Italian (`it`)
+- 🇩🇪 German (`de`)
+- 🇳🇱 Dutch (`nl`)
 
 ### 🎯 Automation Blueprints
 Import ready-to-use blueprints with one click:
@@ -72,8 +99,9 @@ Import ready-to-use blueprints with one click:
 - Light groups
 - Scenes
 - Switches (as events, not entities)
-- Motor-driven covers (blinds, shutters)
+- Motor-driven covers (blinds, shutters, louvre blinds with tilt)
 - Relays
+- Environment sensors (Sensor Platform V4: wind, solar, rain, PIR)
 
 Classic (legacy) firmware notes:
 - Discovery includes both EVO (`FE4D`) and Classic (`CA5A`) advertisements.
@@ -104,15 +132,19 @@ For issues, please include:
 - Your network configuration
 - Device types you're trying to control
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the full history of changes in this fork.
+
 ## Credits
 
-This integration is based on the excellent work by [@lkempf](https://github.com/lkempf):
-- Original integration: [casambi-bt-hass](https://github.com/lkempf/casambi-bt-hass)
-- Original library: [casambi-bt](https://github.com/lkempf/casambi-bt)
+This integration builds on the work of:
+- [@lkempf](https://github.com/lkempf) — original integration: [casambi-bt-hass](https://github.com/lkempf/casambi-bt-hass) and library [casambi-bt](https://github.com/lkempf/casambi-bt)
+- [@rankjie](https://github.com/rankjie) — revamped fork: [casambi-bt-hass](https://github.com/rankjie/casambi-bt-hass) with Classic protocol, switch events, covers and more
 
 ## Development
 
-For development setup and contribution guidelines, see the [original repository](https://github.com/lkempf/casambi-bt-hass#development).
+For development setup and contribution guidelines, see the [upstream repository](https://github.com/rankjie/casambi-bt-hass).
 
 ## License
 

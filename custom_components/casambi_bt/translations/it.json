@@ -1,0 +1,48 @@
+{
+    "entity": {
+        "binary_sensor": {
+            "rain": { "name": "Pioggia" },
+            "pir":  { "name": "Movimento" }
+        },
+        "number": {
+            "white_balance": { "name": "Bilanciamento del bianco" }
+        },
+        "sensor": {
+            "wind":  { "name": "Vento" },
+            "solar": { "name": "Radiazione solare" }
+        }
+    },
+    "config": {
+        "abort": {
+            "already_configured": "Il dispositivo è già configurato",
+            "bluetooth_error": "Bluetooth non sembra funzionare correttamente.",
+            "cannot_connect": "Connessione non riuscita",
+            "invalid_auth": "Autenticazione non valida",
+            "reauth_successful": "Ri-autenticazione riuscita",
+            "unknown": "Errore imprevisto"
+        },
+        "error": {
+            "cannot_connect": "Connessione non riuscita",
+            "invalid_address": "L'indirizzo MAC Bluetooth della rete non è valido.",
+            "invalid_auth": "Autenticazione non valida",
+            "unknown": "Errore imprevisto"
+        },
+        "step": {
+            "user": {
+                "data": {
+                    "address": "Indirizzo MAC Bluetooth",
+                    "import_groups": "Importa gruppi",
+                    "password": "Password"
+                },
+                "title": "Configura la tua rete Casambi",
+                "description": "Trova l'indirizzo MAC Bluetooth (ID rete) nei dettagli del luminaire nell'applicazione Casambi."
+            },
+            "reauth_confirm": {
+                "data": {
+                    "password": "Password"
+                },
+                "title": "Verifica la password della tua rete."
+            }
+        }
+    }
+}

@@ -1,4 +1,17 @@
 {
+    "entity": {
+        "binary_sensor": {
+            "rain": { "name": "Regen" },
+            "pir":  { "name": "Bewegung" }
+        },
+        "number": {
+            "white_balance": { "name": "Weißabgleich" }
+        },
+        "sensor": {
+            "wind":  { "name": "Wind" },
+            "solar": { "name": "Sonnenstrahlung" }
+        }
+    },
     "config": {
         "abort": {
             "already_configured": "Netzwerk ist schon konfiguriert.",
@@ -11,6 +24,7 @@
         },
         "error": {
             "cannot_connect": "Verbindung fehlgeschlagen",
+            "invalid_address": "Die Bluetooth MAC Adresse des Netzwerks ist ungültig.",
             "invalid_auth": "Anmeldung ungültig",
             "unknown": "Unerwarteter Fehler"
         },

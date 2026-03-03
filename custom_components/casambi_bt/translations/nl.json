@@ -1,4 +1,17 @@
 {
+    "entity": {
+        "binary_sensor": {
+            "rain": { "name": "Regen" },
+            "pir":  { "name": "Beweging" }
+        },
+        "number": {
+            "white_balance": { "name": "Witbalans" }
+        },
+        "sensor": {
+            "wind":  { "name": "Wind" },
+            "solar": { "name": "Zonnestraling" }
+        }
+    },
     "config": {
         "abort": {
             "already_configured": "Het apparaat is al geconfigureerd",
@@ -10,18 +23,25 @@
         },
         "error": {
             "cannot_connect": "Kon geen verbinding maken",
-            "invalid_address": "The bluetooth MAC address of the network is invalid.",
+            "invalid_address": "Het Bluetooth MAC-adres van het netwerk is ongeldig.",
             "invalid_auth": "Foutieve authenticatie",
             "unknown": "Onverwachte fout"
         },
         "step": {
             "user": {
                 "data": {
-                    "address": "Adres (Casambi NetworkID)",
-                    "import_groups": "Importeer groupen?",
+                    "address": "Bluetooth MAC-adres",
+                    "import_groups": "Groepen importeren",
                     "password": "Wachtwoord"
                 },
-                "title": "Configureer uw Casambi netwerk"
+                "title": "Configureer uw Casambi-netwerk",
+                "description": "Vind het Bluetooth MAC-adres (Netwerk ID) in de details van uw lamp in de Casambi-app."
+            },
+            "reauth_confirm": {
+                "data": {
+                    "password": "Wachtwoord"
+                },
+                "title": "Bevestig uw netwerkwachtwoord."
             }
         }
     }

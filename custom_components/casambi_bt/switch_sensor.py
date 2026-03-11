@@ -93,9 +93,7 @@ class CasambiSwitchSensor(SensorEntity):
         self._attr_icon = "mdi:button-pointer"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
-        self._hold_seen: set[int] = set()
-        self._last_button: int | None = None
-        self._last_command: str | None = None
+        self._last_event_data: dict[str, Any] = {}
 
     async def async_added_to_hass(self) -> None:
         """Register handlers once hass is available."""
@@ -128,34 +126,14 @@ class CasambiSwitchSensor(SensorEntity):
         # Determine button number to use
         button = button_raw if self._is_kinetic_switch() else (button_app or button_raw)
 
-        # Determine command from event type
-        command: str | None = None
-        if event_type == "button_press" and button is not None:
-            self._hold_seen.discard(button)
-            command = "pressed"
-        elif event_type == "button_hold" and button is not None:
-            self._hold_seen.add(button)
-            command = "held"
-        elif event_type == "button_release" and button is not None:
-            if button not in self._hold_seen:
-                command = "released"
-            # else: suppress — intermediate release during hold, not meaningful
-        elif event_type == "button_release_after_hold" and button is not None:
-            self._hold_seen.discard(button)
-            command = "released_after_hold"
-
-        if command is None:
-            return
-
         _LOGGER.debug(
-            "[CASAMBI_BTN] %s | button=%s | command=%s",
+            "[CASAMBI_BTN] %s | button=%s | event=%s",
             self._unit.name,
             button,
-            command,
+            event_type,
         )
 
-        self._last_button = button
-        self._last_command = command
+        self._last_event_data = {**event_data, "button": button}
 
         # Fire HA event — always delivered, no state deduplication
         self.hass.bus.async_fire(
@@ -164,7 +142,7 @@ class CasambiSwitchSensor(SensorEntity):
                 "unit_id": self._unit.deviceId,
                 "unit_name": self._unit.name,
                 "button": button,
-                "command": command,
+                "event": event_type,
                 "button_raw": button_raw,
                 "button_app": button_app,
             },
@@ -188,20 +166,35 @@ class CasambiSwitchSensor(SensorEntity):
 
     @property
     def native_value(self) -> str:
-        """Return the state as '{button} {command}'."""
-        if self._last_button is None or self._last_command is None:
+        """Return the state showing last event info."""
+        if not self._last_event_data:
             return "no_event"
-        return f"{self._last_button} {self._last_command}"
+        button = self._last_event_data.get("button", "?")
+        event_type = self._last_event_data.get("event", "unknown")
+        event_map = {
+            "button_press": "pressed",
+            "button_hold": "held",
+            "button_release": "released",
+            "button_release_after_hold": "released_after_hold",
+        }
+        return f"Button {button} {event_map.get(event_type, event_type)}"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
-        return {
-            "button": self._last_button,
-            "command": self._last_command,
+        attrs: dict[str, Any] = {
             "device_id": self._unit.deviceId,
             "online": self._unit.online,
         }
+        if self._last_event_data:
+            attrs.update({
+                "event_type": self._last_event_data.get("event"),
+                "button": self._last_event_data.get("button"),
+                "unit_id": self._last_event_data.get("unit_id"),
+                "message_type": self._last_event_data.get("message_type"),
+                "flags": self._last_event_data.get("flags"),
+            })
+        return attrs
 
 
 class CasambiSwitchUnitIdSensor(SensorEntity):

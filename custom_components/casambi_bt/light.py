@@ -51,14 +51,28 @@ CASA_LIGHT_CTRL_TYPES: Final[list[UnitControlType]] = [
 _LOGGER = logging.getLogger(__name__)
 
 
+_LIGHT_CTRL_TYPES: Final[frozenset[UnitControlType]] = frozenset({
+    UnitControlType.RGB,
+    UnitControlType.WHITE,
+    UnitControlType.TEMPERATURE,
+    UnitControlType.XY,
+    UnitControlType.VERTICAL,
+})
+
+
 def _is_cover_unit(unit: Unit) -> bool:
     """Return True if the unit should be treated as a cover (blind/shutter).
 
-    Cover units are identified by having an EXT/ mode (externally controlled
-    actuator) combined with a DIMMER control (position feedback).
+    Same discriminator as cover.py: EXT/1ch/Dim + DIMMER with no light-specific
+    controls. Luminaires (e.g. Occhio Mito) that share the EXT/1ch/Dim mode but
+    carry TEMPERATURE or VERTICAL must not be excluded from the light platform.
     """
     controls = {c.type for c in unit.unitType.controls}
-    return unit.unitType.mode.startswith("EXT/") and UnitControlType.DIMMER in controls
+    return (
+        unit.unitType.mode.startswith("EXT/1ch/Dim")
+        and UnitControlType.DIMMER in controls
+        and not controls.intersection(_LIGHT_CTRL_TYPES)
+    )
 
 
 async def async_setup_entry(
@@ -69,13 +83,12 @@ async def async_setup_entry(
     """Create the Casambi light entities."""
     casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
 
-    # Exclude EXT/1ch/Dim units (motor-driven covers — blinds, shutters).
-    # Other EXT/ variants (e.g. sensor platforms) have no standard light controls
-    # and are naturally excluded by get_units(CASA_LIGHT_CTRL_TYPES).
+    # Exclude motor-driven covers from the light platform.
+    # Uses the same discriminator as cover.py to avoid false exclusions.
     light_entities: list[CasambiLight] = [
         CasambiLightUnit(casa_api, u)
         for u in casa_api.get_units(CASA_LIGHT_CTRL_TYPES)
-        if not u.unitType.mode.startswith("EXT/1ch/Dim")
+        if not _is_cover_unit(u)
     ]
 
     group_entities: list[CasambiLight] = []

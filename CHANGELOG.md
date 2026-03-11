@@ -6,6 +6,19 @@ are documented here. Changes are relative to the upstream fork
 
 ---
 
+## [1.9.0.dev4] — 2026-03-11
+
+### Fixed
+- **Cover false-positive on EXT/1ch/Dim luminaires** — units with `EXT/1ch/Dim` mode and
+  `DIMMER` control but also carrying light-specific controls (`TEMPERATURE`, `RGB`, `WHITE`,
+  `XY`, `VERTICAL`) were incorrectly classified as covers (e.g. Occhio Mito). The
+  `_is_cover_unit` discriminator in both `cover.py` and `light.py` now requires the absence
+  of any light control to confirm a motor-driven blind. Affected luminaires now correctly
+  appear as `light` entities and their `number` entities (e.g. vertical distribution) are
+  restored.
+
+---
+
 ## [1.9.0.dev3] — 2026-03-03
 
 ### Added

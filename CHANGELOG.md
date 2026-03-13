@@ -6,6 +6,16 @@ are documented here. Changes are relative to the upstream fork
 
 ---
 
+## [1.9.0.dev7] — 2026-03-13
+
+### Fixed
+- **DALI-2 lux sensor** — added required `SensorEntity` property overrides (`state_class`,
+  `options`, `last_reset`, `native_unit_of_measurement`, `suggested_display_precision`,
+  `suggested_unit_of_measurement`) that were missing, causing an `AttributeError` when HA
+  tried to register the entity
+
+---
+
 ## [1.9.0.dev6] — 2026-03-13
 
 ### Added

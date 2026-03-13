@@ -1,15 +1,17 @@
 {
   "entity": {
     "binary_sensor": {
-      "rain": { "name": "Rain" },
-      "pir":  { "name": "Motion" }
+      "rain":           { "name": "Rain" },
+      "pir":            { "name": "Motion" },
+      "dali2_presence": { "name": "Presence" }
     },
     "number": {
       "white_balance": { "name": "White balance" }
     },
     "sensor": {
-      "wind":  { "name": "Wind" },
-      "solar": { "name": "Solar radiation" }
+      "wind":      { "name": "Wind" },
+      "solar":     { "name": "Solar radiation" },
+      "dali2_lux": { "name": "Daylight" }
     }
   },
   "config": {

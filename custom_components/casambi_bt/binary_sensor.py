@@ -59,6 +59,11 @@ async def async_setup_entry(
 
     await async_setup_entry_binary_sensors(hass, config_entry, async_add_entities)
 
+    # DALI-2 Sensor{Presence,Daylight}: presence binary sensor
+    from .dali2_sensor import async_setup_entry_dali2_binary_sensors  # noqa: PLC0415
+
+    await async_setup_entry_dali2_binary_sensors(hass, config_entry, async_add_entities)
+
 
 class CasambiBinarySensorEntity(BinarySensorEntity, CasambiNetworkEntity):
     """Defines a Casambi Binary Sensor Entity."""

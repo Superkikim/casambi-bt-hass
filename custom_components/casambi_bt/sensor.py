@@ -38,3 +38,8 @@ async def async_setup_entry(
     from .lamel_controls import async_setup_entry_sensor_lamel  # noqa: PLC0415
 
     await async_setup_entry_sensor_lamel(hass, config_entry, async_add_entities)
+
+    # Set up DALI-2 Sensor{Presence,Daylight} lux sensor
+    from .dali2_sensor import async_setup_entry_dali2_sensors  # noqa: PLC0415
+
+    await async_setup_entry_dali2_sensors(hass, config_entry, async_add_entities)

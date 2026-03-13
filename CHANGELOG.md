@@ -6,6 +6,18 @@ are documented here. Changes are relative to the upstream fork
 
 ---
 
+## [1.9.0.dev6] — 2026-03-13
+
+### Added
+- **DALI-2 Sensor{Presence,Daylight}** — units with mode `DALI Sensor{...}` now expose two entities:
+  - `binary_sensor` (device_class: motion) — presence detected via bits 0–1 of BLE state
+  - `sensor` (device_class: illuminance, unit: lx) — daylight level via bits 2–13
+
+### Changed
+- Removed `[CASAMBI_SENSOR_STATE]` diagnostic log (no longer needed — decoding confirmed)
+
+---
+
 ## [1.9.0.dev5] — 2026-03-13
 
 ### Added

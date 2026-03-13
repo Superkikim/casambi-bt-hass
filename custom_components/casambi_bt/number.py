@@ -38,8 +38,8 @@ async def async_setup_entry(
     casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
 
     vertical_units = list(casa_api.get_units([UnitControlType.VERTICAL]))
-    _LOGGER.info(
-        "Found %d units with VERTICAL control: %s",
+    _LOGGER.warning(
+        "[CASAMBI_VERTICAL] Found %d units with VERTICAL control: %s",
         len(vertical_units),
         [f"{u.name}(id={u.deviceId})" for u in vertical_units],
     )

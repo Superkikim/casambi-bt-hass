@@ -28,34 +28,23 @@ _LOGGER: Final = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Casambi Bluetooth from a config entry."""
-    # Log integration version + file mtime — use this to confirm which code is running.
-    try:
-        _manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
-        _integration_version = _manifest.get("version", "unknown")
-    except Exception:  # noqa: BLE001
-        _integration_version = "unknown"
-    import datetime as _dt  # noqa: PLC0415
-    _file_mtime = _dt.datetime.fromtimestamp(
-        Path(__file__).stat().st_mtime, tz=_dt.UTC  # noqa: ASYNC240
-    ).strftime("%Y-%m-%dT%H:%M:%SZ")
-    _LOGGER.info(
-        "[CASAMBI_STARTUP] integration=casambi_bt version=%s file_mtime=%s entry=%s address=%s",
-        _integration_version,
-        _file_mtime,
+    # [DIAG] Startup marker — visible at WARNING level to confirm which code is running.
+    _LOGGER.warning(
+        "[CASAMBI_STARTUP] integration=casambi_bt entry=%s address=%s",
         entry.entry_id,
         entry.data.get(CONF_ADDRESS),
     )
 
-    # Help testers verify the installed library build quickly.
+    # [DIAG] Library version check.
     try:
-        import CasambiBt as _casambi_pkg  # noqa: PLC0415  # local import for path logging + version
+        import CasambiBt as _casambi_pkg  # noqa: PLC0415
 
         lib_ver = getattr(_casambi_pkg, "__version__", "unknown")
         lib_path = getattr(_casambi_pkg, "__file__", "unknown")
     except Exception:  # noqa: BLE001
         lib_ver = "unknown"
         lib_path = "unknown"
-    _LOGGER.info("Using casambi-bt-revamped=%s (%s)", lib_ver, lib_path)
+    _LOGGER.warning("[CASAMBI_STARTUP] casambi-bt-revamped=%s (%s)", lib_ver, lib_path)
 
     # Check if we need to migrate from old data structure
     if entry.entry_id in hass.data.get(DOMAIN, {}):
@@ -161,10 +150,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = api
 
-    # Log per-unit profile to help debug classification and new fixture types
+    # [DIAG] Per-unit profile to help debug classification and missing entities.
     for unit in api.casa.units:
         controls = [c.type.name for c in unit.unitType.controls]
-        _LOGGER.info(
+        _LOGGER.warning(
             "[CASAMBI_UNIT_PROFILE] id=%d name=%r mode=%r controls=%s",
             unit.deviceId,
             unit.name,
@@ -172,8 +161,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             controls,
         )
 
-    # Log raw network data (for DALI and unknown fixture investigation)
-    _LOGGER.info(
+    # [DIAG] Raw network data (for DALI and unknown fixture investigation).
+    _LOGGER.warning(
         "[CASAMBI_RAW_NETWORK] %s",
         json.dumps(api.casa.rawNetworkData, default=str),
     )

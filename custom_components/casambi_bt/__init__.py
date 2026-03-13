@@ -28,11 +28,16 @@ _LOGGER: Final = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Casambi Bluetooth from a config entry."""
-    _LOGGER.debug(
-        "Setting up entry title=%s entry_id=%s unique_id=%s address=%s",
-        entry.title,
+    # Log integration version from manifest.json — use this to confirm which code is running.
+    try:
+        _manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
+        _integration_version = _manifest.get("version", "unknown")
+    except Exception:  # noqa: BLE001
+        _integration_version = "unknown"
+    _LOGGER.info(
+        "[CASAMBI_STARTUP] integration=casambi_bt version=%s entry=%s address=%s",
+        _integration_version,
         entry.entry_id,
-        entry.unique_id,
         entry.data.get(CONF_ADDRESS),
     )
 

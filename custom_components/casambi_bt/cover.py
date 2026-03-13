@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import cast
+from typing import Final, cast
 
 from CasambiBt import Unit, UnitControlType
 
@@ -23,18 +23,30 @@ from .entities import CasambiUnitEntity, TypedEntityDescription
 
 _LOGGER = logging.getLogger(__name__)
 
+# Controls that indicate a light fixture rather than a motor-driven blind.
+# An EXT/1ch/Dim unit with any of these is a luminaire (e.g. Occhio Mito), not a cover.
+_LIGHT_CTRL_TYPES: Final[frozenset[UnitControlType]] = frozenset({
+    UnitControlType.RGB,
+    UnitControlType.WHITE,
+    UnitControlType.TEMPERATURE,
+    UnitControlType.XY,
+    UnitControlType.VERTICAL,
+})
+
 
 def _is_cover_unit(unit: Unit) -> bool:
     """Return True if the unit should be treated as a cover (blind/shutter).
 
-    Cover units are identified by the EXT/1ch/Dim mode (single-channel external
-    dimmable actuator, used for motor-driven blinds and shutters) combined with
-    a DIMMER control (position feedback).
+    Cover units are identified by the EXT/1ch/Dim mode combined with a DIMMER
+    control (position feedback) and the absence of any light-specific controls.
+    Luminaires such as Occhio Mito also use EXT/1ch/Dim + DIMMER but additionally
+    carry TEMPERATURE, VERTICAL, etc. — these must not be treated as covers.
     """
     controls = {c.type for c in unit.unitType.controls}
     return (
         unit.unitType.mode.startswith("EXT/1ch/Dim")
         and UnitControlType.DIMMER in controls
+        and not controls.intersection(_LIGHT_CTRL_TYPES)
     )
 
 

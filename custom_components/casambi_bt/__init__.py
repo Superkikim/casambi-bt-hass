@@ -776,6 +776,15 @@ class CasambiApi:
 
     @callback
     def _unit_changed_handler(self, unit: Unit) -> None:
+        # [DIAG] Log state updates for units with UNKNOWN controls (sensor investigation).
+        if any(c.type.name in ("UNKOWN", "UNKNOWN") for c in unit.unitType.controls):
+            _LOGGER.warning(
+                "[CASAMBI_SENSOR_STATE] id=%d name=%r mode=%r state=%s",
+                unit.deviceId,
+                unit.name,
+                unit.unitType.mode,
+                vars(unit.state) if unit.state is not None else None,
+            )
         if unit.deviceId not in self._callback_map:
             return
         for c in self._callback_map[unit.deviceId]:

@@ -151,6 +151,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = api
 
+    # Log per-unit profile to help debug classification and new fixture types
+    for unit in api.casa.units:
+        controls = [c.type.name for c in unit.unitType.controls]
+        _LOGGER.info(
+            "[CASAMBI_UNIT_PROFILE] id=%d name=%r type_id=%d mode=%r controls=%s",
+            unit.deviceId,
+            unit.name,
+            unit.unitType.typeId,
+            unit.unitType.mode,
+            controls,
+        )
+
+    # Log raw network data (for DALI and unknown fixture investigation)
+    _LOGGER.info(
+        "[CASAMBI_RAW_NETWORK] %s",
+        json.dumps(api.casa.rawNetworkData, default=str),
+    )
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Register services

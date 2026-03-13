@@ -1,4 +1,8 @@
-.PHONY: lint format-check hassfest check fix
+.PHONY: setup lint format-check hassfest check fix
+
+# Install dev dependencies (run once before make check)
+setup:
+	pip install -r requirements_dev.txt
 
 # Run ruff linter (mirrors lkempf CI)
 lint:

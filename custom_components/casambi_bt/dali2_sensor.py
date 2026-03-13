@@ -103,6 +103,38 @@ class CasambiDali2LuxSensor(CasambiUnitEntity, SensorEntity):
         self._attr_native_unit_of_measurement = "lx"
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
+    # TypedEntityDescription does not extend SensorEntityDescription — override
+    # sensor-specific cached properties explicitly to prevent AttributeError.
+    @property
+    def state_class(self):
+        """Return MEASUREMENT state class."""
+        return SensorStateClass.MEASUREMENT
+
+    @property
+    def options(self):
+        """Return None (no fixed option list)."""
+        return None
+
+    @property
+    def last_reset(self):
+        """Return None (current measurement)."""
+        return None
+
+    @property
+    def native_unit_of_measurement(self):
+        """Return lux as unit of measurement."""
+        return "lx"
+
+    @property
+    def suggested_display_precision(self):
+        """Return None (use default precision)."""
+        return None
+
+    @property
+    def suggested_unit_of_measurement(self):
+        """Return None (no conversion suggested)."""
+        return None
+
     @property
     def native_value(self) -> int | None:
         """Return lux value decoded from bits 2–13 of the BLE state."""

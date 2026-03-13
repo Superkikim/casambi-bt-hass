@@ -155,10 +155,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     for unit in api.casa.units:
         controls = [c.type.name for c in unit.unitType.controls]
         _LOGGER.info(
-            "[CASAMBI_UNIT_PROFILE] id=%d name=%r type_id=%d mode=%r controls=%s",
+            "[CASAMBI_UNIT_PROFILE] id=%d name=%r mode=%r controls=%s",
             unit.deviceId,
             unit.name,
-            unit.unitType.typeId,
             unit.unitType.mode,
             controls,
         )

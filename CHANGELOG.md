@@ -6,6 +6,20 @@ are documented here. Changes are relative to the upstream fork
 
 ---
 
+## [1.9.0.dev5] — 2026-03-13
+
+### Added
+- **DALI2 Sensor diagnostics** — units with `UNKNOWN` controls (e.g. `DALI Sensor{Presence,Daylight}`)
+  now emit a `[CASAMBI_SENSOR_STATE]` WARNING log on every state change, to help decode
+  the BLE state format and prepare future sensor support
+
+### Changed
+- **Diagnostic logs promoted to WARNING** — all `[CASAMBI_STARTUP]`, `[CASAMBI_UNIT_PROFILE]`,
+  `[CASAMBI_RAW_NETWORK]`, `[CASAMBI_VERTICAL]` logs are now at WARNING level (previously INFO
+  or DEBUG) so they are visible without any custom log level configuration
+
+---
+
 ## [1.9.0.dev4] — 2026-03-11
 
 ### Fixed

@@ -176,6 +176,9 @@ casambi_bt_hass_v*.zip
 # Local development resources (venv, scripts, notes — not for the repo)
 local_resources/
 
+# Linter / type-checker caches
+.ruff_cache/
+
 # Development tools & OS
 .claude/
 .DS_Store

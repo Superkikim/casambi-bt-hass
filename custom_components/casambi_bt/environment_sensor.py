@@ -45,14 +45,14 @@ _accumulated: dict[str, dict[int, int]] = {}
 
 # Numeric sensors: sensor_index → (translation_key, icon, divisor)
 _NUMERIC_SPECS: dict[int, tuple[str, str, int]] = {
-    1: ("wind",  "mdi:weather-windy", 4),
+    1: ("wind", "mdi:weather-windy", 4),
     2: ("solar", "mdi:weather-sunny", 4),
 }
 
 # Binary sensors: sensor_index → (translation_key, icon, device_class, on_threshold)
 _BINARY_SPECS: dict[int, tuple[str, str, BinarySensorDeviceClass, int]] = {
     0: ("rain", "mdi:weather-rainy", BinarySensorDeviceClass.MOISTURE, 2),
-    3: ("pir",  "mdi:motion-sensor", BinarySensorDeviceClass.MOTION,        1),
+    3: ("pir", "mdi:motion-sensor", BinarySensorDeviceClass.MOTION, 1),
 }
 
 _ALL_SENSOR_COUNT = len(_NUMERIC_SPECS) + len(_BINARY_SPECS)
@@ -121,7 +121,9 @@ async def async_setup_entry(
         for sensor_index, control_index in _iter_sensor_controls(unit, count):
             if sensor_index in _NUMERIC_SPECS:
                 entities.append(
-                    CasambiEnvironmentSensor(casa_api, unit, control_index, sensor_index)
+                    CasambiEnvironmentSensor(
+                        casa_api, unit, control_index, sensor_index
+                    )
                 )
 
     _LOGGER.info("Creating %d numeric environment sensor entities", len(entities))

@@ -130,9 +130,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "decrypted_data": decrypted_data_str,
                 "message_position": event.get("message_position"),
                 "payload_hex": payload_hex_str,
-                "extra_data": extra_data.hex()
-                if isinstance(extra_data, bytes)
-                else extra_data,
+                "extra_data": (
+                    extra_data.hex() if isinstance(extra_data, bytes) else extra_data
+                ),
             },
         )
 
@@ -517,7 +517,10 @@ async def async_setup_services(hass: HomeAssistant) -> None:  # noqa: C901
 
         async def handle_set_white_balance(call: ServiceCall) -> None:
             """Handle the set_white_balance service call."""
-            from homeassistant.helpers.entity_platform import async_get_platforms  # noqa: I001, PLC0415
+            from homeassistant.helpers.entity_platform import (  # noqa: PLC0415
+                async_get_platforms,
+            )
+
             from .light import CasambiLightUnit  # noqa: PLC0415
 
             entity_ids: list[str] = call.data["entity_id"]
@@ -526,9 +529,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:  # noqa: C901
                 if platform.domain != "light":
                     continue
                 for entity in platform.entities.values():
-                    if (
-                        entity.entity_id in entity_ids
-                        and isinstance(entity, CasambiLightUnit)
+                    if entity.entity_id in entity_ids and isinstance(
+                        entity, CasambiLightUnit
                     ):
                         await entity.async_set_white_balance(value)
 

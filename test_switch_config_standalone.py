@@ -17,6 +17,7 @@ BUTTON_ACTIONS = {
     7: "Resume Automation Group",
 }
 
+
 def _resolve_target_name(raw_network_data, action, target):
     """Resolve target ID to a name based on action type."""
     if not raw_network_data or target == 0:
@@ -54,13 +55,19 @@ def _resolve_target_name(raw_network_data, action, target):
 
     return ""
 
+
 def _is_switch_unit(unit):
     """Check if a unit is a switch based on its model or manufacturer."""
     # Check model name
     model_lower = unit.unitType.model.lower()
     switch_keywords = {
-        "switch", "xpress", "button", "pushbutton",
-        "batteryswitch", "wall switch", "remote"
+        "switch",
+        "xpress",
+        "button",
+        "pushbutton",
+        "batteryswitch",
+        "wall switch",
+        "remote",
     }
     if any(keyword in model_lower for keyword in switch_keywords):
         return True
@@ -72,7 +79,13 @@ def _is_switch_unit(unit):
 
     # Check if unit has no light controls but still has controls
     light_controls = {
-        "DIMMER", "RGB", "WHITE", "TEMPERATURE", "XY", "COLORSOURCE", "ONOFF"
+        "DIMMER",
+        "RGB",
+        "WHITE",
+        "TEMPERATURE",
+        "XY",
+        "COLORSOURCE",
+        "ONOFF",
     }
     unit_controls = {c.type.name for c in unit.unitType.controls}
 
@@ -81,6 +94,7 @@ def _is_switch_unit(unit):
         return True
 
     return False
+
 
 def _get_unit_switch_config(raw_network_data, unit_id):
     """Extract switch configuration for a specific unit from network data."""
@@ -95,6 +109,7 @@ def _get_unit_switch_config(raw_network_data, unit_id):
             return unit_data.get("switchConfig")
 
     return None
+
 
 # Sample network data structure
 sample_network_data = {
@@ -113,16 +128,20 @@ sample_network_data = {
                 "switchConfig": {
                     "buttons": [
                         {"type": 0, "action": 1, "target": 5},  # Button 1: Scene 5
-                        {"type": 1, "action": 3, "target": 12}, # Button 2: Group 12
-                        {"type": 2, "action": 0, "target": 0},  # Button 3: Not configured
-                        {"type": 3, "action": 4, "target": 255}, # Button 4: All Units
-                        {"type": 4, "action": 2, "target": 32}, # Button 5: Unit 32
+                        {"type": 1, "action": 3, "target": 12},  # Button 2: Group 12
+                        {
+                            "type": 2,
+                            "action": 0,
+                            "target": 0,
+                        },  # Button 3: Not configured
+                        {"type": 3, "action": 4, "target": 255},  # Button 4: All Units
+                        {"type": 4, "action": 2, "target": 32},  # Button 5: Unit 32
                     ],
                     "exclusiveScenes": False,
                     "longPressAllOff": True,
                     "toggleDisabled": False,
-                    "parameters": {}
-                }
+                    "parameters": {},
+                },
             },
             {
                 "deviceID": 32,
@@ -130,12 +149,12 @@ sample_network_data = {
                 "name": "Table Lamp",
                 "type": 101,
                 "address": "00:11:22:33:44:66",
-                "firmware": "1.2.3"
-            }
+                "firmware": "1.2.3",
+            },
         ],
         "scenes": [
             {"sceneID": 5, "name": "Evening"},
-            {"sceneID": 6, "name": "Movie Time"}
+            {"sceneID": 6, "name": "Movie Time"},
         ],
         "grid": {
             "cells": [
@@ -143,14 +162,13 @@ sample_network_data = {
                     "type": 2,
                     "groupID": 12,
                     "name": "Living Room",
-                    "cells": [
-                        {"type": 1, "unit": 32}
-                    ]
+                    "cells": [{"type": 1, "unit": 32}],
                 }
             ]
-        }
+        },
     }
 }
+
 
 def test_button_action_resolution():
     """Test resolving button actions to readable text."""
@@ -180,6 +198,7 @@ def test_button_action_resolution():
         print(f"Button {button_num}: {result}")
         print(f"  Raw: action={action}, target={target}")
 
+
 def test_switch_detection():
     """Test switch unit detection."""
     print("\nSwitch Detection Test:")
@@ -188,9 +207,7 @@ def test_switch_detection():
     # Create mock unit objects
     switch_unit = SimpleNamespace(
         unitType=SimpleNamespace(
-            model="Xpress Switch",
-            manufacturer="Casambi",
-            controls=[]
+            model="Xpress Switch", manufacturer="Casambi", controls=[]
         )
     )
 
@@ -200,13 +217,14 @@ def test_switch_detection():
             manufacturer="Generic",
             controls=[
                 SimpleNamespace(type=SimpleNamespace(name="DIMMER")),
-                SimpleNamespace(type=SimpleNamespace(name="ONOFF"))
-            ]
+                SimpleNamespace(type=SimpleNamespace(name="ONOFF")),
+            ],
         )
     )
 
     print(f"Xpress Switch: {_is_switch_unit(switch_unit)}")  # Should be True
-    print(f"LED Driver: {_is_switch_unit(lamp_unit)}")      # Should be False
+    print(f"LED Driver: {_is_switch_unit(lamp_unit)}")  # Should be False
+
 
 def test_get_unit_switch_config():
     """Test extracting switch config for a unit."""
@@ -221,6 +239,7 @@ def test_get_unit_switch_config():
     print("\nSwitch Config for Unit 32:")
     print(config)  # Should be None
 
+
 def test_button_creation_logic():
     """Test which buttons should be created."""
     print("\nButton Creation Logic Test:")
@@ -232,7 +251,7 @@ def test_button_creation_logic():
     for button_num in range(1, 5):
         button_config = next(
             (b for b in buttons if b.get("type") == button_num - 1),
-            {"type": button_num - 1, "action": 0, "target": 0}
+            {"type": button_num - 1, "action": 0, "target": 0},
         )
         action = button_config.get("action", 0)
         print(f"Button {button_num}: CREATE (action={action})")
@@ -240,14 +259,14 @@ def test_button_creation_logic():
     # Create buttons 5-8 only if configured
     for button_num in range(5, 9):
         button_config = next(
-            (b for b in buttons if b.get("type") == button_num - 1),
-            None
+            (b for b in buttons if b.get("type") == button_num - 1), None
         )
         if button_config and button_config.get("action", 0) != 0:
             action = button_config.get("action", 0)
             print(f"Button {button_num}: CREATE (action={action})")
         else:
             print(f"Button {button_num}: SKIP (not configured)")
+
 
 if __name__ == "__main__":
     print("Testing Switch Configuration Logic")

@@ -21,16 +21,20 @@ sample_network_data = {
                 "switchConfig": {
                     "buttons": [
                         {"type": 0, "action": 1, "target": 5},  # Button 1: Scene 5
-                        {"type": 1, "action": 3, "target": 12}, # Button 2: Group 12
-                        {"type": 2, "action": 0, "target": 0},  # Button 3: Not configured
-                        {"type": 3, "action": 4, "target": 255}, # Button 4: All Units
-                        {"type": 4, "action": 2, "target": 32}, # Button 5: Unit 32
+                        {"type": 1, "action": 3, "target": 12},  # Button 2: Group 12
+                        {
+                            "type": 2,
+                            "action": 0,
+                            "target": 0,
+                        },  # Button 3: Not configured
+                        {"type": 3, "action": 4, "target": 255},  # Button 4: All Units
+                        {"type": 4, "action": 2, "target": 32},  # Button 5: Unit 32
                     ],
                     "exclusiveScenes": False,
                     "longPressAllOff": True,
                     "toggleDisabled": False,
-                    "parameters": {}
-                }
+                    "parameters": {},
+                },
             },
             {
                 "deviceID": 32,
@@ -38,12 +42,12 @@ sample_network_data = {
                 "name": "Table Lamp",
                 "type": 101,
                 "address": "00:11:22:33:44:66",
-                "firmware": "1.2.3"
-            }
+                "firmware": "1.2.3",
+            },
         ],
         "scenes": [
             {"sceneID": 5, "name": "Evening"},
-            {"sceneID": 6, "name": "Movie Time"}
+            {"sceneID": 6, "name": "Movie Time"},
         ],
         "grid": {
             "cells": [
@@ -51,14 +55,13 @@ sample_network_data = {
                     "type": 2,
                     "groupID": 12,
                     "name": "Living Room",
-                    "cells": [
-                        {"type": 1, "unit": 32}
-                    ]
+                    "cells": [{"type": 1, "unit": 32}],
                 }
             ]
-        }
+        },
     }
 }
+
 
 def test_button_action_resolution():
     """Test resolving button actions to readable text."""
@@ -90,6 +93,7 @@ def test_button_action_resolution():
         print(f"Button {button_num}: {result}")
         print(f"  Raw: action={action}, target={target}")
 
+
 def test_switch_detection():
     """Test switch unit detection."""
     from types import SimpleNamespace
@@ -99,9 +103,7 @@ def test_switch_detection():
     # Create mock unit objects
     switch_unit = SimpleNamespace(
         unitType=SimpleNamespace(
-            model="Xpress Switch",
-            manufacturer="Casambi",
-            controls=[]
+            model="Xpress Switch", manufacturer="Casambi", controls=[]
         )
     )
 
@@ -111,14 +113,15 @@ def test_switch_detection():
             manufacturer="Generic",
             controls=[
                 SimpleNamespace(type=SimpleNamespace(name="DIMMER")),
-                SimpleNamespace(type=SimpleNamespace(name="ONOFF"))
-            ]
+                SimpleNamespace(type=SimpleNamespace(name="ONOFF")),
+            ],
         )
     )
 
     print("\nSwitch Detection Test:")
     print(f"Xpress Switch: {_is_switch_unit(switch_unit)}")  # Should be True
-    print(f"LED Driver: {_is_switch_unit(lamp_unit)}")      # Should be False
+    print(f"LED Driver: {_is_switch_unit(lamp_unit)}")  # Should be False
+
 
 def test_get_unit_switch_config():
     """Test extracting switch config for a unit."""
@@ -133,6 +136,7 @@ def test_get_unit_switch_config():
     config = _get_unit_switch_config(sample_network_data, 32)
     print("\nSwitch Config for Unit 32:")
     print(config)  # Should be None
+
 
 if __name__ == "__main__":
     print("Testing Switch Configuration Sensors")

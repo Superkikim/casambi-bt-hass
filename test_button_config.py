@@ -14,9 +14,9 @@ from CasambiBt import CasambiBt
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
+
 
 async def test_button_config():
     """Test updating button configuration."""
@@ -30,8 +30,12 @@ async def test_button_config():
     # Button configuration to test
     UNIT_ID = 31  # The switch unit ID
     BUTTON_INDEX = 1  # Button 2 (0-based index)
-    ACTION_TYPE = "control_unit"  # Action type: "none", "control_unit", "scene", "cycle_modes"
-    TARGET_UNIT_ID = 18  # Target unit to control (not needed for "none" or "cycle_modes")
+    ACTION_TYPE = (
+        "control_unit"  # Action type: "none", "control_unit", "scene", "cycle_modes"
+    )
+    TARGET_UNIT_ID = (
+        18  # Target unit to control (not needed for "none" or "cycle_modes")
+    )
 
     print("Testing button configuration update...")
     print(f"  Unit ID: {UNIT_ID}")
@@ -46,10 +50,7 @@ async def test_button_config():
         # Connect to the network
         print("\nConnecting to Casambi network...")
         await casa.connect(
-            email=EMAIL,
-            password=PASSWORD,
-            networkId=NETWORK_ID,
-            address=BT_ADDRESS
+            email=EMAIL, password=PASSWORD, networkId=NETWORK_ID, address=BT_ADDRESS
         )
         print("Connected successfully!")
 
@@ -63,7 +64,9 @@ async def test_button_config():
             switch_config = unit.unitConfig.get("switchConfig", {})
             buttons = switch_config.get("buttons", [])
             if len(buttons) > BUTTON_INDEX:
-                print(f"Current button {BUTTON_INDEX + 1} config: {buttons[BUTTON_INDEX]}")
+                print(
+                    f"Current button {BUTTON_INDEX + 1} config: {buttons[BUTTON_INDEX]}"
+                )
             else:
                 print(f"Button {BUTTON_INDEX + 1} not configured yet")
         else:
@@ -76,7 +79,7 @@ async def test_button_config():
             unit_id=UNIT_ID,
             button_index=BUTTON_INDEX,
             action_type=ACTION_TYPE,
-            target_unit_id=TARGET_UNIT_ID
+            target_unit_id=TARGET_UNIT_ID,
         )
         print("Button configuration update sent!")
 
@@ -98,6 +101,7 @@ async def test_button_config():
         print("\nDisconnecting...")
         await casa.disconnect()
         print("Disconnected.")
+
 
 if __name__ == "__main__":
     print("Casambi Button Configuration Test")

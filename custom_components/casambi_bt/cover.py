@@ -25,13 +25,15 @@ _LOGGER = logging.getLogger(__name__)
 
 # Controls that indicate a light fixture rather than a motor-driven blind.
 # An EXT/1ch/Dim unit with any of these is a luminaire (e.g. Occhio Mito), not a cover.
-_LIGHT_CTRL_TYPES: Final[frozenset[UnitControlType]] = frozenset({
-    UnitControlType.RGB,
-    UnitControlType.WHITE,
-    UnitControlType.TEMPERATURE,
-    UnitControlType.XY,
-    UnitControlType.VERTICAL,
-})
+_LIGHT_CTRL_TYPES: Final[frozenset[UnitControlType]] = frozenset(
+    {
+        UnitControlType.RGB,
+        UnitControlType.WHITE,
+        UnitControlType.TEMPERATURE,
+        UnitControlType.XY,
+        UnitControlType.VERTICAL,
+    }
+)
 
 
 def _is_cover_unit(unit: Unit) -> bool:

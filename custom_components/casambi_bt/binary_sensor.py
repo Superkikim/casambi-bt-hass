@@ -55,7 +55,7 @@ async def async_setup_entry(
         _LOGGER.debug("No binary sensor entities available.")
 
     # Sensor Platform V4: rain (precipitation) and PIR (motion) binary sensors
-    from .environment_sensor import async_setup_entry_binary_sensors  # noqa: I001, PLC0415
+    from .environment_sensor import async_setup_entry_binary_sensors  # noqa: PLC0415
 
     await async_setup_entry_binary_sensors(hass, config_entry, async_add_entities)
 

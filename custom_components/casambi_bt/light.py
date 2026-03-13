@@ -51,13 +51,15 @@ CASA_LIGHT_CTRL_TYPES: Final[list[UnitControlType]] = [
 _LOGGER = logging.getLogger(__name__)
 
 
-_LIGHT_CTRL_TYPES: Final[frozenset[UnitControlType]] = frozenset({
-    UnitControlType.RGB,
-    UnitControlType.WHITE,
-    UnitControlType.TEMPERATURE,
-    UnitControlType.XY,
-    UnitControlType.VERTICAL,
-})
+_LIGHT_CTRL_TYPES: Final[frozenset[UnitControlType]] = frozenset(
+    {
+        UnitControlType.RGB,
+        UnitControlType.WHITE,
+        UnitControlType.TEMPERATURE,
+        UnitControlType.XY,
+        UnitControlType.VERTICAL,
+    }
+)
 
 
 def _is_cover_unit(unit: Unit) -> bool:
@@ -245,9 +247,15 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
     async def async_set_white_balance(self, value: float) -> None:
         """Set the white balance (0-100%) by writing WCB bits to raw state."""
         unit = cast("Unit", self._obj)
-        if unit.state is None or unit.state.raw_state is None or self._wcb_offset is None:
+        if (
+            unit.state is None
+            or unit.state.raw_state is None
+            or self._wcb_offset is None
+        ):
             return
-        raw_val = max(0, min(_WCB_RAW_MAX, round(_WCB_RAW_MAX - value * _WCB_RAW_MAX / 100)))
+        raw_val = max(
+            0, min(_WCB_RAW_MAX, round(_WCB_RAW_MAX - value * _WCB_RAW_MAX / 100))
+        )
         raw = bytearray(unit.state.raw_state)
         _write_bits(raw, self._wcb_offset, self._wcb_length, raw_val)
         await _send_raw_state(self._api, unit, raw)

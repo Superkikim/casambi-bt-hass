@@ -37,7 +37,7 @@ _LOGGER = logging.getLogger(__name__)
 # (bit_offset, bit_size, value) tuples, in the same order.
 
 _PRESENCE_IDX = 0  # _unknown_controls[0] → (0, 2, presence_value)
-_LUX_IDX = 1       # _unknown_controls[1] → (2, 12, lux_value)
+_LUX_IDX = 1  # _unknown_controls[1] → (2, 12, lux_value)
 
 
 def _is_dali2_sensor(unit: Unit) -> bool:

@@ -66,7 +66,9 @@ async def async_setup_entry(
     await async_setup_entry_number(hass, config_entry, async_add_entities)
 
     # PWM+RGB+TW lights: White balance slider (WHITECOLORBALANCE)
-    from .white_color_balance import async_setup_entry_number_white_color_balance  # noqa: I001, PLC0415
+    from .white_color_balance import (  # noqa: PLC0415
+        async_setup_entry_number_white_color_balance,
+    )
 
     await async_setup_entry_number_white_color_balance(
         hass, config_entry, async_add_entities

@@ -20,6 +20,6 @@
   "integration_type": "hub",
   "iot_class": "local_push",
   "loggers": ["custom_components.casambi_bt", "CasambiBt"],
-  "requirements": ["casambi-bt-revamped==0.4.2.dev5"],
-  "version": "1.9.0.dev7"
+  "requirements": ["casambi-bt-skk==0.4.0b1.post4"],
+  "version": "1.9.0.dev8"
 }

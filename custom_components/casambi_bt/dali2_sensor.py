@@ -33,23 +33,17 @@ _LOGGER = logging.getLogger(__name__)
 #   bits  2–13  (12 bits) → daylight in lux
 #   bit  14     (1 bit)   → reserved / unknown flag
 #
-# The lib decodes these into unit.state._unknown_controls as a list of
-# (bit_offset, bit_size, value) tuples, in the same order.
+# The mode string "DALI Sensor{Presence,Daylight}" contains element names
+# that match the UNKOWN controls in order. The library maps these into
+# unit.state.sensors: {"Presence": value, "Daylight": value}.
 
-_PRESENCE_IDX = 0  # _unknown_controls[0] → (0, 2, presence_value)
-_LUX_IDX = 1  # _unknown_controls[1] → (2, 12, lux_value)
+_PRESENCE_KEY = "Presence"
+_LUX_KEY = "Daylight"
 
 
 def _is_dali2_sensor(unit: Unit) -> bool:
     """Return True if unit is a DALI-2 Sensor{Presence,Daylight}."""
     return unit.unitType.mode.startswith("DALI Sensor")
-
-
-def _unknown_controls(unit: Unit) -> list[tuple[int, int, int]] | None:
-    """Return _unknown_controls from unit state, or None if unavailable."""
-    if unit.state is None:
-        return None
-    return getattr(unit.state, "_unknown_controls", None)
 
 
 async def async_setup_entry_dali2_sensors(
@@ -137,11 +131,11 @@ class CasambiDali2LuxSensor(CasambiUnitEntity, SensorEntity):
 
     @property
     def native_value(self) -> int | None:
-        """Return lux value decoded from bits 2–13 of the BLE state."""
-        controls = _unknown_controls(cast("Unit", self._obj))
-        if not controls or len(controls) <= _LUX_IDX:
+        """Return lux value from the library's named sensor readings."""
+        unit = cast("Unit", self._obj)
+        if unit.state is None:
             return None
-        return controls[_LUX_IDX][2]
+        return unit.state.sensors.get(_LUX_KEY)
 
 
 class CasambiDali2PresenceSensor(CasambiUnitEntity, BinarySensorEntity):
@@ -159,8 +153,11 @@ class CasambiDali2PresenceSensor(CasambiUnitEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return True when presence is detected (bits 0–1 non-zero)."""
-        controls = _unknown_controls(cast("Unit", self._obj))
-        if not controls or len(controls) <= _PRESENCE_IDX:
+        """Return True when presence is detected."""
+        unit = cast("Unit", self._obj)
+        if unit.state is None:
             return None
-        return controls[_PRESENCE_IDX][2] != 0
+        presence = unit.state.sensors.get(_PRESENCE_KEY)
+        if presence is None:
+            return None
+        return presence != 0

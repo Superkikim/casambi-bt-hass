@@ -112,7 +112,23 @@ class CasambiSwitchSensor(SensorEntity):
     @callback
     def _handle_switch_event(self, event_data: dict[str, Any]) -> None:
         """Handle incoming switch events."""
-        if event_data.get("unit_id") != self._unit.deviceId:
+        unit_id = event_data.get("unit_id")
+        msg_type = event_data.get("message_type")
+        event_type = event_data.get("event")
+        button = event_data.get("button")
+
+        _LOGGER.debug(
+            "[BTN_SENSOR] raw event: unit=%s unit_id=%s msg_type=0x%02x button=%s event=%s flags=0x%04x",
+            self._unit.name,
+            unit_id,
+            msg_type or 0,
+            button,
+            event_type,
+            event_data.get("flags") or 0,
+        )
+
+        if unit_id != self._unit.deviceId:
+            _LOGGER.debug("[BTN_SENSOR] ignored — unit_id mismatch (got %s, want %s)", unit_id, self._unit.deviceId)
             return
 
         # A single physical press on PTM215B produces both type 0x08 and 0x10
@@ -121,21 +137,20 @@ class CasambiSwitchSensor(SensorEntity):
         #   0x10 → all 4 event types; discard its PRESS/RELEASE (duplicates of 0x08)
         #          but keep HOLD + RELEASE_AFTER_HOLD (only source for these)
         # For non-kinetic switches: ignore 0x08 entirely.
-        msg_type = event_data.get("message_type")
-        event_type = event_data.get("event")
         if self._is_kinetic_switch():
             if msg_type == 0x10 and event_type in ("button_press", "button_release"):
+                _LOGGER.debug("[BTN_SENSOR] ignored — kinetic: 0x10 press/release is duplicate of 0x08")
                 return
         elif msg_type == 0x08:
+            _LOGGER.debug("[BTN_SENSOR] ignored — non-kinetic: 0x08 not used")
             return
 
-        button = event_data.get("button")
-
         _LOGGER.debug(
-            "[CASAMBI_BTN] %s | button=%s | event=%s",
+            "[BTN_SENSOR] accepted: %s button=%s event=%s msg_type=0x%02x → firing casambi_bt_button_event",
             self._unit.name,
             button,
             event_type,
+            msg_type or 0,
         )
 
         self._last_event_data = event_data

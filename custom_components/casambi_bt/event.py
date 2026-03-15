@@ -117,25 +117,48 @@ class CasambiButtonEventEntity(EventEntity):
     @callback
     def _handle_switch_event(self, event_data: dict[str, Any]) -> None:
         """Handle incoming switch event dict from CasambiApi."""
-        if event_data.get("unit_id") != self._unit.deviceId:
+        unit_id = event_data.get("unit_id")
+        msg_type = event_data.get("message_type")
+        event_type = event_data.get("event", "unknown")
+        button = event_data.get("button")
+
+        _LOGGER.debug(
+            "[BTN_EVENT] raw: unit=%s unit_id=%s msg_type=0x%02x button=%s event=%s → entity Button %d",
+            self._unit.name,
+            unit_id,
+            msg_type or 0,
+            button,
+            event_type,
+            self._button_number,
+        )
+
+        if unit_id != self._unit.deviceId:
             return
-        if event_data.get("button") != self._button_number:
+        if button != self._button_number:
+            _LOGGER.debug("[BTN_EVENT] ignored — button %s ≠ entity button %d", button, self._button_number)
             return
 
         # Deduplicate: PTM215B sends both 0x08 and 0x10 in the same BLE packet.
         # Use 0x08 for press/release (correct button numbers).
         # Use 0x10 for hold/release_after_hold (only source for these).
-        msg_type = event_data.get("message_type")
-        event_type = event_data.get("event", "unknown")
         if self._is_kinetic_switch():
             if msg_type == 0x10 and event_type in ("button_press", "button_release"):
+                _LOGGER.debug("[BTN_EVENT] ignored — kinetic: 0x10 press/release is duplicate of 0x08")
                 return
         elif msg_type == 0x08:
+            _LOGGER.debug("[BTN_EVENT] ignored — non-kinetic: 0x08 not used")
             return
 
         action = _EVENT_TO_ACTION.get(event_type)
         if action is None:
+            _LOGGER.debug("[BTN_EVENT] ignored — unknown event_type %r", event_type)
             return
 
-        self._trigger_event(action, {"unit_id": event_data.get("unit_id")})
+        _LOGGER.debug(
+            "[BTN_EVENT] firing: %s Button %d → action=%s",
+            self._unit.name,
+            self._button_number,
+            action,
+        )
+        self._trigger_event(action, {"unit_id": unit_id})
         self.async_write_ha_state()

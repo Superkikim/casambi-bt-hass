@@ -1,9 +1,9 @@
 """Event entities for Casambi switch units.
 
-Creates HA EventEntity instances for each switch unit, allowing button presses
-to appear as device triggers in the Home Assistant automation UI.
+Creates one HA EventEntity per physical button per switch unit.
+In the automation UI this appears as: "<Device> Button N: detected <action>"
 
-Event types exposed: button_press, button_hold, button_release, button_release_after_hold.
+Action types: press, hold, release, release_after_hold.
 """
 
 from __future__ import annotations
@@ -25,12 +25,19 @@ from .switch_sensor import _is_switch_unit
 
 _LOGGER = logging.getLogger(__name__)
 
-_BUTTON_EVENT_TYPES = [
-    "button_press",
-    "button_hold",
-    "button_release",
-    "button_release_after_hold",
-]
+_BUTTON_ACTIONS = ["press", "hold", "release", "release_after_hold"]
+
+# Map from the event dict strings (from __init__.py) to short action names
+_EVENT_TO_ACTION: dict[str, str] = {
+    "button_press": "press",
+    "button_hold": "hold",
+    "button_release": "release",
+    "button_release_after_hold": "release_after_hold",
+}
+
+# Number of physical buttons to expose per switch unit.
+# PTM215B has 4; unknown switch types default to 4 (unused buttons stay silent).
+_BUTTONS_PER_SWITCH = 4
 
 
 async def async_setup_entry(
@@ -38,36 +45,47 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Casambi switch event entities."""
+    """Set up Casambi switch event entities (one per button per switch unit)."""
     casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
 
     switch_units = [unit for unit in casa_api.casa.units if _is_switch_unit(unit)]
 
-    _LOGGER.info("Creating %d switch event entities", len(switch_units))
+    _LOGGER.info(
+        "Creating %d button event entities (%d switches × %d buttons)",
+        len(switch_units) * _BUTTONS_PER_SWITCH,
+        len(switch_units),
+        _BUTTONS_PER_SWITCH,
+    )
 
-    if switch_units:
-        async_add_entities(
-            CasambiSwitchEventEntity(casa_api, unit) for unit in switch_units
-        )
+    entities = [
+        CasambiButtonEventEntity(casa_api, unit, btn)
+        for unit in switch_units
+        for btn in range(1, _BUTTONS_PER_SWITCH + 1)
+    ]
+    if entities:
+        async_add_entities(entities)
 
 
-class CasambiSwitchEventEntity(EventEntity):
-    """HA EventEntity for a Casambi switch unit.
+class CasambiButtonEventEntity(EventEntity):
+    """HA EventEntity for one physical button of a Casambi switch unit.
 
-    Fires button_press / button_hold / button_release / button_release_after_hold
-    events that appear as device triggers in the automation UI.
+    Automation UI shows: "<Device> Button N: detected <action>"
+    where action is one of: press, hold, release, release_after_hold.
     """
 
     _attr_has_entity_name = True
-    _attr_name = "Button"
     _attr_icon = "mdi:gesture-tap-button"
-    _attr_event_types = _BUTTON_EVENT_TYPES
+    _attr_event_types = _BUTTON_ACTIONS
 
-    def __init__(self, api: CasambiApi, unit: Unit) -> None:
-        """Initialize the switch event entity."""
+    def __init__(self, api: CasambiApi, unit: Unit, button_number: int) -> None:
+        """Initialize the button event entity."""
         self._api = api
         self._unit = unit
-        self._attr_unique_id = f"{api.casa.networkId}-unit-{unit.uuid}-event"
+        self._button_number = button_number
+        self._attr_name = f"Button {button_number}"
+        self._attr_unique_id = (
+            f"{api.casa.networkId}-unit-{unit.uuid}-button-{button_number}-event"
+        )
 
     async def async_added_to_hass(self) -> None:
         """Register switch event callback."""
@@ -101,13 +119,12 @@ class CasambiSwitchEventEntity(EventEntity):
         """Handle incoming switch event dict from CasambiApi."""
         if event_data.get("unit_id") != self._unit.deviceId:
             return
+        if event_data.get("button") != self._button_number:
+            return
 
-        # A single physical press on PTM215B produces both type 0x08 and 0x10
-        # messages in the same BLE packet. For kinetic (EnOcean) switches:
-        #   0x08 → PRESS + RELEASE only, correct button numbers (use these)
-        #   0x10 → all 4 event types; discard its PRESS/RELEASE (duplicates of 0x08)
-        #          but keep HOLD + RELEASE_AFTER_HOLD (only source for these)
-        # For non-kinetic switches: ignore 0x08 entirely.
+        # Deduplicate: PTM215B sends both 0x08 and 0x10 in the same BLE packet.
+        # Use 0x08 for press/release (correct button numbers).
+        # Use 0x10 for hold/release_after_hold (only source for these).
         msg_type = event_data.get("message_type")
         event_type = event_data.get("event", "unknown")
         if self._is_kinetic_switch():
@@ -115,15 +132,10 @@ class CasambiSwitchEventEntity(EventEntity):
                 return
         elif msg_type == 0x08:
             return
-        if event_type not in _BUTTON_EVENT_TYPES:
+
+        action = _EVENT_TO_ACTION.get(event_type)
+        if action is None:
             return
 
-        self._trigger_event(
-            event_type,
-            {
-                "button": event_data.get("button"),
-                "unit_id": event_data.get("unit_id"),
-                "flags": event_data.get("flags"),
-            },
-        )
+        self._trigger_event(action, {"unit_id": event_data.get("unit_id")})
         self.async_write_ha_state()

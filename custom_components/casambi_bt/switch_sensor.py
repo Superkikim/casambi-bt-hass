@@ -105,26 +105,14 @@ class CasambiSwitchSensor(SensorEntity):
         self._api.unregister_switch_event_callback(self._handle_switch_event)
         await super().async_will_remove_from_hass()
 
-    def _is_kinetic_switch(self) -> bool:
-        """Return True for EnOcean kinetic switches (e.g. PTM215B)."""
-        return "Kinetic" in self._unit.unitType.mode
-
     @callback
     def _handle_switch_event(self, event_data: dict[str, Any]) -> None:
         """Handle incoming switch events."""
-        # Check if this event is for our unit
         if event_data.get("unit_id") != self._unit.deviceId:
             return
 
-        raw_index = event_data.get("button_event_index")
-        if raw_index is None:
-            raw_index = event_data.get("input_index")
-        button_raw = (raw_index + 1) if raw_index is not None else None
-        button_app = event_data.get("button")
+        button = event_data.get("button")
         event_type = event_data.get("event")
-
-        # Determine button number to use
-        button = button_raw if self._is_kinetic_switch() else (button_app or button_raw)
 
         _LOGGER.debug(
             "[CASAMBI_BTN] %s | button=%s | event=%s",
@@ -133,9 +121,9 @@ class CasambiSwitchSensor(SensorEntity):
             event_type,
         )
 
-        self._last_event_data = {**event_data, "button": button}
+        self._last_event_data = event_data
 
-        # Fire HA event — always delivered, no state deduplication
+        # Fire HA event
         self.hass.bus.async_fire(
             "casambi_bt_button_event",
             {
@@ -143,12 +131,9 @@ class CasambiSwitchSensor(SensorEntity):
                 "unit_name": self._unit.name,
                 "button": button,
                 "event": event_type,
-                "button_raw": button_raw,
-                "button_app": button_app,
             },
         )
 
-        # Update the entity state
         self.async_write_ha_state()
 
     @property

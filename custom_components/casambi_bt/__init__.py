@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Final
 
 from CasambiBt import Casambi, Group, Scene, Unit, UnitControlType
+from CasambiBt._switch import ButtonEventType, SwitchEvent
 from CasambiBt.errors import AuthenticationError, BluetoothError, NetworkNotFoundError
 import yaml
 
@@ -24,6 +25,14 @@ from homeassistant.helpers.httpx_client import get_async_client
 from .const import DOMAIN, PLATFORMS
 
 _LOGGER: Final = logging.getLogger(__name__)
+
+_BUTTON_EVENT_STRINGS: dict[ButtonEventType, str] = {
+    ButtonEventType.PRESS: "button_press",
+    ButtonEventType.RELEASE: "button_release",
+    ButtonEventType.HOLD: "button_hold",
+    ButtonEventType.RELEASE_AFTER_HOLD: "button_release_after_hold",
+    ButtonEventType.UNKNOWN: "unknown",
+}
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -58,81 +67,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api = CasambiApi(hass, entry, entry.data[CONF_ADDRESS], entry.data[CONF_PASSWORD])
     await api.connect()
 
-    # No buffering/dedup here; emit exactly what the library delivers.
+    # Emit a clean HA bus event for each switch event received from the lib.
     def _emit_event(event: dict) -> None:
-        """Emit one event to HA."""
-        # Convert any bytes objects to hex strings for JSON serialization
-        raw_packet = event.get("raw_packet")
-        decrypted_data = event.get("decrypted_data")
-        payload_hex = event.get("payload_hex")
+        """Emit one switch event to the HA bus."""
         extra_data = event.get("extra_data")
-
-        # The library provides ASCII-hex bytes for raw_packet/decrypted_data/payload_hex.
-        # Convert bytes -> str via ASCII decode directly (not .hex()).
-        raw_packet_str = (
-            raw_packet.decode("ascii")
-            if isinstance(raw_packet, (bytes, bytearray))
-            else raw_packet
-        )
-        decrypted_data_str = (
-            decrypted_data.decode("ascii")
-            if isinstance(decrypted_data, (bytes, bytearray))
-            else decrypted_data
-        )
-        payload_hex_str = (
-            payload_hex.decode("ascii")
-            if isinstance(payload_hex, (bytes, bytearray))
-            else payload_hex
-        )
-
-        unit_id = event.get("unit_id")
-        button = event.get("button")
-        action = event.get("event")
-        event_id = event.get("event_id")
-
-        # Optional INVOCATION metadata (new parser)
-        opcode = event.get("opcode")
-        target_type = event.get("target_type")
-        origin = event.get("origin")
-        age = event.get("age")
-        invocation_flags = event.get("invocation_flags", event.get("flags"))
-        button_event_index = event.get("button_event_index")
-        param_p = event.get("param_p")
-        param_s = event.get("param_s")
-
         hass.bus.async_fire(
             f"{DOMAIN}_switch_event",
             {
                 "entry_id": entry.entry_id,
-                "unit_id": unit_id,
-                "button": button,
-                "action": action,
+                "unit_id": event.get("unit_id"),
+                "button": event.get("button"),
+                "event": event.get("event"),
                 "message_type": event.get("message_type"),
-                "flags": invocation_flags,
-                "event_id": event_id,
-                "opcode": opcode,
-                "target_type": target_type,
-                "origin": origin,
-                "age": age,
-                "button_event_index": button_event_index,
-                "param_p": param_p,
-                "param_s": param_s,
-                # NotifyInput fields (target_type=0x12), exposed by casambi-bt-revamped parser
-                "input_index": event.get("input_index"),
-                "input_code": event.get("input_code"),
-                "input_b1": event.get("input_b1"),
-                "input_channel": event.get("input_channel"),
-                "input_value16": event.get("input_value16"),
-                "input_mapped_event": event.get("input_mapped_event"),
-                "packet_sequence": event.get("packet_sequence"),
-                "arrival_sequence": event.get("arrival_sequence"),
-                "raw_packet": raw_packet_str,
-                "decrypted_data": decrypted_data_str,
-                "message_position": event.get("message_position"),
-                "payload_hex": payload_hex_str,
-                "extra_data": (
-                    extra_data.hex() if isinstance(extra_data, bytes) else extra_data
-                ),
+                "flags": event.get("flags"),
+                "action": event.get("action"),
+                "extra_data": extra_data.hex() if isinstance(extra_data, bytes) else extra_data,
             },
         )
 
@@ -784,16 +733,29 @@ class CasambiApi:
             c(unit)
 
     @callback
-    def _switch_event_handler(self, event_data: dict) -> None:
-        """Handle switch events from the Casambi network."""
-        _LOGGER.debug("Switch event received: %s", event_data)
+    def _switch_event_handler(self, event_data: SwitchEvent) -> None:
+        """Handle switch events from the Casambi network.
+
+        Converts the lib's SwitchEvent dataclass to a plain dict before
+        dispatching to registered callbacks.
+        """
+        event_dict: dict = {
+            "unit_id": event_data.unit_id,
+            "button": event_data.button,
+            "event": _BUTTON_EVENT_STRINGS.get(event_data.event, "unknown"),
+            "message_type": event_data.message_type,
+            "flags": event_data.flags,
+            "action": event_data.action,
+            "extra_data": event_data.extra_data,
+        }
+        _LOGGER.debug("Switch event received: %s", event_dict)
         for cb in self._switch_event_callbacks:
             if asyncio.iscoroutinefunction(cb):
                 self.conf_entry.async_create_task(
-                    self.hass, cb(event_data), "switch_event_callback"
+                    self.hass, cb(event_dict), "switch_event_callback"
                 )
             else:
-                cb(event_data)
+                cb(event_dict)
 
     def register_switch_event_callback(self, callback: Callable[[dict], None]) -> None:
         """Register a callback for switch events."""

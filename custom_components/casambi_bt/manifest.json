@@ -21,5 +21,5 @@
   "iot_class": "local_push",
   "loggers": ["custom_components.casambi_bt", "CasambiBt"],
   "requirements": ["casambi-bt-skk==0.4.0b1.post5"],
-  "version": "1.9.0.dev9"
+  "version": "1.9.0.dev10"
 }

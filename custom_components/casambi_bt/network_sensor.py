@@ -59,7 +59,7 @@ class CasambiNetworkConfigSensor(SensorEntity):
     @property
     def native_value(self) -> str:
         """Return the state showing network info summary."""
-        raw_data = self._api.casa.rawNetworkData
+        raw_data = getattr(self._api.casa, "rawNetworkData", None)
         if not raw_data:
             return "No network data available"
 
@@ -69,7 +69,7 @@ class CasambiNetworkConfigSensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the raw network configuration as attributes."""
-        raw_data = self._api.casa.rawNetworkData
+        raw_data = getattr(self._api.casa, "rawNetworkData", None)
         if not raw_data:
             return {"error": "No network data available"}
 

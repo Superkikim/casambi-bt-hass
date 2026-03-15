@@ -10,9 +10,9 @@ The Lamel Intelligent has 7 bytes of state (bit offsets):
   53    : ONOFF   → Intelligent $intel        ← switch entity
   54    : ONOFF   → $startstop               ← button entity (toggle louvre open/close)
 
-Because UnitState only holds ONE slider and ONE onoff value, we cannot use
-setUnitState() without clobbering other controls.  We read raw_state bytes,
-flip the target bits, and send via OpCode.SetState using the lib's _send().
+Writes use casa.setControlValue() which reads the current raw_state bytes, patches
+only the target bits, and sends — preserving all other controls including the
+read-only sensorgroup blob. Reads use _read_bits() over unit.state.raw_state.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Final, cast
 
-from CasambiBt import Unit, UnitControlType
+from CasambiBt import Unit, UnitControl, UnitControlType
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
@@ -83,7 +83,7 @@ def _is_lamel_intelligent(unit: Unit) -> bool:
     )
 
 
-# ── Raw-state bit helpers ─────────────────────────────────────────────────────
+# ── Raw-state bit read helper ─────────────────────────────────────────────────
 
 
 def _read_bits(raw: bytes, offset: int, length: int) -> int:
@@ -95,23 +95,9 @@ def _read_bits(raw: bytes, offset: int, length: int) -> int:
     return (val >> bit_offset) & ((1 << length) - 1)
 
 
-def _write_bits(raw: bytearray, offset: int, length: int, value: int) -> None:
-    """Set `length` bits at bit `offset` in mutable raw state bytes (little-endian)."""
-    val_shifted = value << (offset % 8)
-    byte_len = (length + offset % 8 + 7) // 8
-    val_bytes = val_shifted.to_bytes(byte_len, byteorder="little", signed=False)
-    clear_mask = ((1 << length) - 1) << (offset % 8)
-    for i in range(byte_len):
-        byte_idx = offset // 8 + i
-        mask_byte = (clear_mask >> (i * 8)) & 0xFF
-        raw[byte_idx] = (raw[byte_idx] & ~mask_byte) | (val_bytes[i] & mask_byte)
-
-
-async def _send_raw_state(api: CasambiApi, unit: Unit, raw: bytearray) -> None:
-    """Send a full raw-state packet to the unit (bypasses UnitState abstraction)."""
-    from CasambiBt._operation import OpCode  # private but stable  # noqa: PLC0415
-
-    await api.casa._send(unit, bytes(raw), OpCode.SetState)  # noqa: SLF001
+def _find_ctrl(unit: Unit, offset: int) -> UnitControl:
+    """Return the UnitControl at the given bit offset (must exist)."""
+    return next(c for c in unit.unitType.controls if c.offset == offset)
 
 
 # ── Platform setup functions ──────────────────────────────────────────────────
@@ -221,6 +207,7 @@ class CasambiLamelSwitch(CasambiUnitEntity, SwitchEntity):
         )
         super().__init__(api, desc, unit)
         self._bit_offset = bit_offset
+        self._ctrl: UnitControl = _find_ctrl(unit, bit_offset)
         self._attr_icon = icon
 
     @property
@@ -234,20 +221,12 @@ class CasambiLamelSwitch(CasambiUnitEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Set the ONOFF control bit to 1 (on)."""
         unit = cast("Unit", self._obj)
-        if unit.state is None or unit.state.raw_state is None:
-            return
-        raw = bytearray(unit.state.raw_state)
-        _write_bits(raw, self._bit_offset, 1, 1)
-        await _send_raw_state(self._api, unit, raw)
+        await self._api.casa.setControlValue(unit, self._ctrl, 1)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Set the ONOFF control bit to 0 (off)."""
         unit = cast("Unit", self._obj)
-        if unit.state is None or unit.state.raw_state is None:
-            return
-        raw = bytearray(unit.state.raw_state)
-        _write_bits(raw, self._bit_offset, 1, 0)
-        await _send_raw_state(self._api, unit, raw)
+        await self._api.casa.setControlValue(unit, self._ctrl, 0)
 
 
 class CasambiLamelToggleButton(CasambiUnitEntity, ButtonEntity):
@@ -267,6 +246,7 @@ class CasambiLamelToggleButton(CasambiUnitEntity, ButtonEntity):
             entity_type="lamel-startstop",
         )
         super().__init__(api, desc, unit)
+        self._ctrl: UnitControl = _find_ctrl(unit, _CTRL_POS_OFFSET)
         self._attr_icon = "mdi:play-pause"
 
     async def async_press(self) -> None:
@@ -276,9 +256,7 @@ class CasambiLamelToggleButton(CasambiUnitEntity, ButtonEntity):
             return
         current = _read_bits(unit.state.raw_state, _CTRL_POS_OFFSET, 8)
         target = 0 if current >= 245 else 255
-        raw = bytearray(unit.state.raw_state)
-        _write_bits(raw, _CTRL_POS_OFFSET, 8, target)
-        await _send_raw_state(self._api, unit, raw)
+        await self._api.casa.setControlValue(unit, self._ctrl, target)
 
 
 class CasambiLamelShadowSun(CasambiUnitEntity, NumberEntity):
@@ -292,6 +270,7 @@ class CasambiLamelShadowSun(CasambiUnitEntity, NumberEntity):
             entity_type="lamel-shadow-sun",
         )
         super().__init__(api, desc, unit)
+        self._ctrl: UnitControl = _find_ctrl(unit, _CTRL_SHADOW_OFFSET)
         self._attr_icon = "mdi:weather-partly-cloudy"
         self._attr_native_min_value = 0.0
         self._attr_native_max_value = 100.0
@@ -311,12 +290,8 @@ class CasambiLamelShadowSun(CasambiUnitEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Set the Shadow/Sun position from a percentage value (0-100)."""
         unit = cast("Unit", self._obj)
-        if unit.state is None or unit.state.raw_state is None:
-            return
-        raw_val = round(value * 255 / 100)
-        raw = bytearray(unit.state.raw_state)
-        _write_bits(raw, _CTRL_SHADOW_OFFSET, 8, max(0, min(255, raw_val)))
-        await _send_raw_state(self._api, unit, raw)
+        raw_val = max(0, min(255, round(value * 255 / 100)))
+        await self._api.casa.setControlValue(unit, self._ctrl, raw_val)
 
 
 class CasambiLamelTiltDegrees(CasambiUnitEntity, NumberEntity):
@@ -330,6 +305,7 @@ class CasambiLamelTiltDegrees(CasambiUnitEntity, NumberEntity):
             entity_type="lamel-tilt-degrees",
         )
         super().__init__(api, desc, unit)
+        self._ctrl: UnitControl = _find_ctrl(unit, _CTRL_POS_OFFSET)
         self._attr_icon = "mdi:angle-acute"
         self._attr_native_min_value = 0.0
         self._attr_native_max_value = 142.0
@@ -349,12 +325,8 @@ class CasambiLamelTiltDegrees(CasambiUnitEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Set the louvre slat angle from a degree value (0-142)."""
         unit = cast("Unit", self._obj)
-        if unit.state is None or unit.state.raw_state is None:
-            return
-        raw_val = round(value * 255 / 142)
-        raw = bytearray(unit.state.raw_state)
-        _write_bits(raw, _CTRL_POS_OFFSET, 8, max(0, min(255, raw_val)))
-        await _send_raw_state(self._api, unit, raw)
+        raw_val = max(0, min(255, round(value * 255 / 142)))
+        await self._api.casa.setControlValue(unit, self._ctrl, raw_val)
 
 
 class CasambiLamelCoolWarm(CasambiUnitEntity, NumberEntity):
@@ -368,6 +340,7 @@ class CasambiLamelCoolWarm(CasambiUnitEntity, NumberEntity):
             entity_type="lamel-coolwarm",
         )
         super().__init__(api, desc, unit)
+        self._ctrl: UnitControl = _find_ctrl(unit, _CTRL_TEMP_OFFSET)
         self._attr_icon = "mdi:thermometer"
         self._attr_device_class = NumberDeviceClass.TEMPERATURE
         self._attr_native_min_value = _TEMP_MIN
@@ -388,12 +361,8 @@ class CasambiLamelCoolWarm(CasambiUnitEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Set the Cool/Warm temperature setpoint in degrees Celsius (15-30)."""
         unit = cast("Unit", self._obj)
-        if unit.state is None or unit.state.raw_state is None:
-            return
-        raw_val = round((value - _TEMP_MIN) * 255 / (_TEMP_MAX - _TEMP_MIN))
-        raw = bytearray(unit.state.raw_state)
-        _write_bits(raw, _CTRL_TEMP_OFFSET, 8, max(0, min(255, raw_val)))
-        await _send_raw_state(self._api, unit, raw)
+        raw_val = max(0, min(255, round((value - _TEMP_MIN) * 255 / (_TEMP_MAX - _TEMP_MIN))))
+        await self._api.casa.setControlValue(unit, self._ctrl, raw_val)
 
 
 class CasambiLamelTemperature(CasambiUnitEntity, SensorEntity):

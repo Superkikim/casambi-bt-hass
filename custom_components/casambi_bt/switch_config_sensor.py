@@ -179,7 +179,7 @@ async def async_setup_entry(
     sensor_entities = []
     for unit in switch_units:
         # Get complete unit data
-        unit_data = _get_unit_data(casa_api.casa.rawNetworkData, unit.deviceId)
+        unit_data = _get_unit_data(getattr(casa_api.casa, "rawNetworkData", None), unit.deviceId)
 
         if unit_data:
             # Get button configurations
@@ -282,7 +282,7 @@ class CasambiButtonActionSensor(SensorEntity):
         if action_type in [3, 4, 9]:  # All units actions
             return action_text
         target_name = _resolve_target_name(
-            self._api.casa.rawNetworkData, action_type, target
+            getattr(self._api.casa, "rawNetworkData", None), action_type, target
         )
         if target_name:
             return f"{action_text}: {target_name}"

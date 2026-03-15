@@ -42,7 +42,7 @@ from __future__ import annotations
 import logging
 from typing import cast
 
-from CasambiBt import Unit, UnitControlType
+from CasambiBt import Unit, UnitControl, UnitControlType
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
@@ -85,37 +85,6 @@ def _is_white_color_balance_unit(unit: Unit) -> bool:
     return _find_wcb_control(unit) is not None
 
 
-# ── Raw-state bit helpers ─────────────────────────────────────────────────────
-
-
-def _read_bits(raw: bytes, offset: int, length: int) -> int:
-    """Read `length` bits at bit `offset` from raw state bytes (little-endian)."""
-    byte_offset = offset // 8
-    bit_offset = offset % 8
-    num_bytes = (length + bit_offset + 7) // 8
-    val = int.from_bytes(raw[byte_offset : byte_offset + num_bytes], "little")
-    return (val >> bit_offset) & ((1 << length) - 1)
-
-
-def _write_bits(raw: bytearray, offset: int, length: int, value: int) -> None:
-    """Set `length` bits at bit `offset` in mutable raw state bytes (little-endian)."""
-    val_shifted = value << (offset % 8)
-    byte_len = (length + offset % 8 + 7) // 8
-    val_bytes = val_shifted.to_bytes(byte_len, byteorder="little", signed=False)
-    clear_mask = ((1 << length) - 1) << (offset % 8)
-    for i in range(byte_len):
-        byte_idx = offset // 8 + i
-        mask_byte = (clear_mask >> (i * 8)) & 0xFF
-        raw[byte_idx] = (raw[byte_idx] & ~mask_byte) | (val_bytes[i] & mask_byte)
-
-
-async def _send_raw_state(api: CasambiApi, unit: Unit, raw: bytearray) -> None:
-    """Send a full raw-state packet to the unit (bypasses UnitState abstraction)."""
-    from CasambiBt._operation import OpCode  # private but stable  # noqa: PLC0415
-
-    await api.casa._send(unit, bytes(raw), OpCode.SetState)  # noqa: SLF001
-
-
 # ── Platform setup ────────────────────────────────────────────────────────────
 
 
@@ -152,8 +121,7 @@ class CasambiWhiteColorBalance(CasambiUnitEntity, NumberEntity):
     def __init__(self, api: CasambiApi, unit: Unit) -> None:
         """Initialize a White balance number entity for the given unit."""
         ctrl = _find_wcb_control(unit)
-        self._ctrl_offset: int = ctrl.offset
-        self._ctrl_length: int = ctrl.length
+        self._ctrl: UnitControl = ctrl
         desc = TypedEntityDescription(
             key=unit.uuid,
             translation_key="white_balance",
@@ -171,19 +139,20 @@ class CasambiWhiteColorBalance(CasambiUnitEntity, NumberEntity):
     def native_value(self) -> float | None:
         """Return the current white balance as %."""
         unit = cast("Unit", self._obj)
-        if unit.state is None or unit.state.raw_state is None:
+        if unit.state is None:
             return None
-        raw_val = _read_bits(unit.state.raw_state, self._ctrl_offset, self._ctrl_length)
-        return round((_WCB_RAW_MAX - raw_val) * 100 / _WCB_RAW_MAX)
+        entry = next(
+            (v for o, _l, v in unit.state.unknown_controls if o == self._ctrl.offset),
+            None,
+        )
+        if entry is None:
+            return None
+        return round((_WCB_RAW_MAX - entry) * 100 / _WCB_RAW_MAX)
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the white balance from a percentage."""
         unit = cast("Unit", self._obj)
-        if unit.state is None or unit.state.raw_state is None:
-            return
         raw_val = max(
             0, min(_WCB_RAW_MAX, round(_WCB_RAW_MAX - value * _WCB_RAW_MAX / 100))
         )
-        raw = bytearray(unit.state.raw_state)
-        _write_bits(raw, self._ctrl_offset, self._ctrl_length, raw_val)
-        await _send_raw_state(self._api, unit, raw)
+        await self._api.casa.setControlValue(unit, self._ctrl, raw_val)

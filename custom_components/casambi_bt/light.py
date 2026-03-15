@@ -7,7 +7,7 @@ from copy import copy
 import logging
 from typing import Any, Final, cast
 
-from CasambiBt import ColorSource, Group, Unit, UnitControlType, UnitState, _operation
+from CasambiBt import ColorSource, Group, Unit, UnitControl, UnitControlType, UnitState
 from CasambiBt.errors import ProtocolError
 
 from homeassistant.components.light import (
@@ -32,13 +32,7 @@ from .entities import (
     CasambiUnitEntity,
     TypedEntityDescription,
 )
-from .white_color_balance import (
-    _WCB_RAW_MAX,
-    _find_wcb_control,
-    _read_bits,
-    _send_raw_state,
-    _write_bits,
-)
+from .white_color_balance import _WCB_RAW_MAX, _find_wcb_control
 
 CASA_LIGHT_CTRL_TYPES: Final[list[UnitControlType]] = [
     UnitControlType.DIMMER,
@@ -175,9 +169,7 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
             self._attr_min_color_temp_kelvin = temp_control.min
             self._attr_max_color_temp_kelvin = temp_control.max
 
-        ctrl = _find_wcb_control(unit)
-        self._wcb_offset: int | None = ctrl.offset if ctrl else None
-        self._wcb_length: int | None = ctrl.length if ctrl else None
+        self._wcb_ctrl: UnitControl | None = _find_wcb_control(unit)
 
         desc = TypedEntityDescription(key=unit.uuid, name=None, entity_type="light")
 
@@ -236,29 +228,28 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return white_balance (0-100%) for RGB+TW units that have a WCB control."""
-        if self._wcb_offset is None:
+        if self._wcb_ctrl is None:
             return {}
         unit = cast("Unit", self._obj)
-        if unit.state is None or unit.state.raw_state is None:
+        if unit.state is None:
             return {}
-        raw_val = _read_bits(unit.state.raw_state, self._wcb_offset, self._wcb_length)
-        return {"white_balance": round((_WCB_RAW_MAX - raw_val) * 100 / _WCB_RAW_MAX)}
+        entry = next(
+            (v for o, _l, v in unit.state.unknown_controls if o == self._wcb_ctrl.offset),
+            None,
+        )
+        if entry is None:
+            return {}
+        return {"white_balance": round((_WCB_RAW_MAX - entry) * 100 / _WCB_RAW_MAX)}
 
     async def async_set_white_balance(self, value: float) -> None:
-        """Set the white balance (0-100%) by writing WCB bits to raw state."""
-        unit = cast("Unit", self._obj)
-        if (
-            unit.state is None
-            or unit.state.raw_state is None
-            or self._wcb_offset is None
-        ):
+        """Set the white balance (0-100%) via setControlValue."""
+        if self._wcb_ctrl is None:
             return
+        unit = cast("Unit", self._obj)
         raw_val = max(
             0, min(_WCB_RAW_MAX, round(_WCB_RAW_MAX - value * _WCB_RAW_MAX / 100))
         )
-        raw = bytearray(unit.state.raw_state)
-        _write_bits(raw, self._wcb_offset, self._wcb_length, raw_val)
-        await _send_raw_state(self._api, unit, raw)
+        await self._api.casa.setControlValue(unit, self._wcb_ctrl, raw_val)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the unit."""
@@ -417,19 +408,17 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the unit."""
-        # HACK: Some ONOFF-only lights don't respond to SetLevel on EVO, so use SetState.
-        # Classic networks don't support INVOCATION (SetState), so use SetLevel directly.
+        # Some ONOFF-only lights don't respond to SetLevel on EVO networks; use
+        # setUnitState (SetState opcode) instead. Classic networks use SetLevel.
         if self.color_mode == ColorMode.ONOFF:
             if self._api.is_classic_network:
                 await self._api.casa.setLevel(cast("Unit", self._obj), 0)
             else:
                 unit = cast("Unit", self._obj)
                 try:
-                    await self._api.casa._send(  # noqa: SLF001
-                        unit,
-                        bytes(unit.unitType.stateLength),
-                        _operation.OpCode.SetState,
-                    )
+                    state = UnitState()
+                    state.onoff = False
+                    await self._api.casa.setUnitState(unit, state)
                 except ProtocolError as err:
                     if "Classic networks" not in str(err):
                         raise

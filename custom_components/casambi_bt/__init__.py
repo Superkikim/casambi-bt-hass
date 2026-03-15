@@ -164,7 +164,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # [DIAG] Raw network data (for DALI and unknown fixture investigation).
     _LOGGER.warning(
         "[CASAMBI_RAW_NETWORK] %s",
-        json.dumps(api.casa.rawNetworkData, default=str),
+        json.dumps(getattr(api.casa, "rawNetworkData", None), default=str),
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -195,7 +195,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:  # noqa: C901
             casa_api: CasambiApi = hass.data[DOMAIN][entry.entry_id]
 
             # Get the raw network data
-            raw_data = casa_api.casa.rawNetworkData
+            raw_data = getattr(casa_api.casa, "rawNetworkData", None)
             if not raw_data:
                 raise ValueError("No network data available")
 
@@ -469,7 +469,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:  # noqa: C901
 
                 # Include full network config if requested
                 if include_network_config:
-                    raw_network = casa.rawNetworkData
+                    raw_network = getattr(casa, "rawNetworkData", None)
                     if raw_network:
                         diag["network_config"] = raw_network
 

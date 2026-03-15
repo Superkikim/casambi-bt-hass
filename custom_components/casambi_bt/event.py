@@ -92,13 +92,29 @@ class CasambiSwitchEventEntity(EventEntity):
             via_device=(DOMAIN, self._api.casa.networkId),
         )
 
+    def _is_kinetic_switch(self) -> bool:
+        """Return True for EnOcean kinetic switches (e.g. PTM215B)."""
+        return "Kinetic" in self._unit.unitType.mode
+
     @callback
     def _handle_switch_event(self, event_data: dict[str, Any]) -> None:
         """Handle incoming switch event dict from CasambiApi."""
         if event_data.get("unit_id") != self._unit.deviceId:
             return
 
+        # A single physical press on PTM215B produces both type 0x08 and 0x10
+        # messages in the same BLE packet. For kinetic (EnOcean) switches:
+        #   0x08 → PRESS + RELEASE only, correct button numbers (use these)
+        #   0x10 → all 4 event types; discard its PRESS/RELEASE (duplicates of 0x08)
+        #          but keep HOLD + RELEASE_AFTER_HOLD (only source for these)
+        # For non-kinetic switches: ignore 0x08 entirely.
+        msg_type = event_data.get("message_type")
         event_type = event_data.get("event", "unknown")
+        if self._is_kinetic_switch():
+            if msg_type == 0x10 and event_type in ("button_press", "button_release"):
+                return
+        elif msg_type == 0x08:
+            return
         if event_type not in _BUTTON_EVENT_TYPES:
             return
 

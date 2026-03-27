@@ -113,15 +113,15 @@ class CasambiSwitchSensor(SensorEntity):
     def _handle_switch_event(self, event_data: dict[str, Any]) -> None:
         """Handle incoming switch events."""
         unit_id = event_data.get("unit_id")
-        msg_type = event_data.get("message_type")
+        target_type = event_data.get("target_type")
         event_type = event_data.get("event")
         button = event_data.get("button")
 
         _LOGGER.debug(
-            "[BTN_SENSOR] raw event: unit=%s unit_id=%s msg_type=0x%02x button=%s event=%s flags=0x%04x",
+            "[BTN_SENSOR] raw event: unit=%s unit_id=%s target_type=0x%02x button=%s event=%s flags=0x%04x",
             self._unit.name,
             unit_id,
-            msg_type or 0,
+            target_type or 0,
             button,
             event_type,
             event_data.get("flags") or 0,
@@ -131,26 +131,27 @@ class CasambiSwitchSensor(SensorEntity):
             _LOGGER.debug("[BTN_SENSOR] ignored — unit_id mismatch (got %s, want %s)", unit_id, self._unit.deviceId)
             return
 
-        # A single physical press on PTM215B produces both type 0x08 and 0x10
-        # messages in the same BLE packet. For kinetic (EnOcean) switches:
-        #   0x08 → PRESS + RELEASE only, correct button numbers (use these)
-        #   0x10 → all 4 event types; discard its PRESS/RELEASE (duplicates of 0x08)
-        #          but keep HOLD + RELEASE_AFTER_HOLD (only source for these)
-        # For non-kinetic switches: ignore 0x08 entirely.
+        # A single physical press on PTM215B produces both a button stream (0x06)
+        # and an input stream (0x12) frame in the same BLE packet.
+        # For kinetic (EnOcean) switches:
+        #   0x06 (button stream) → PRESS + RELEASE only (use these)
+        #   0x12 (input stream)  → all 4 event types; discard its PRESS/RELEASE (duplicates)
+        #                          but keep HOLD + RELEASE_AFTER_HOLD (only source for these)
+        # For non-kinetic switches: ignore 0x06 (button stream) entirely.
         if self._is_kinetic_switch():
-            if msg_type == 0x10 and event_type in ("button_press", "button_release"):
-                _LOGGER.debug("[BTN_SENSOR] ignored — kinetic: 0x10 press/release is duplicate of 0x08")
+            if target_type == 0x12 and event_type in ("button_press", "button_release"):
+                _LOGGER.debug("[BTN_SENSOR] ignored — kinetic: input stream press/release is duplicate of button stream")
                 return
-        elif msg_type == 0x08:
-            _LOGGER.debug("[BTN_SENSOR] ignored — non-kinetic: 0x08 not used")
+        elif target_type == 0x06:
+            _LOGGER.debug("[BTN_SENSOR] ignored — non-kinetic: button stream not used")
             return
 
         _LOGGER.debug(
-            "[BTN_SENSOR] accepted: %s button=%s event=%s msg_type=0x%02x → firing casambi_bt_button_event",
+            "[BTN_SENSOR] accepted: %s button=%s event=%s target_type=0x%02x → firing casambi_bt_button_event",
             self._unit.name,
             button,
             event_type,
-            msg_type or 0,
+            target_type or 0,
         )
 
         self._last_event_data = event_data

@@ -118,15 +118,15 @@ class CasambiButtonEventEntity(EventEntity):
     def _handle_switch_event(self, event_data: dict[str, Any]) -> None:
         """Handle incoming switch event dict from CasambiApi."""
         unit_id = event_data.get("unit_id")
-        msg_type = event_data.get("message_type")
+        target_type = event_data.get("target_type")
         event_type = event_data.get("event", "unknown")
         button = event_data.get("button")
 
         _LOGGER.debug(
-            "[BTN_EVENT] raw: unit=%s unit_id=%s msg_type=0x%02x button=%s event=%s → entity Button %d",
+            "[BTN_EVENT] raw: unit=%s unit_id=%s target_type=0x%02x button=%s event=%s → entity Button %d",
             self._unit.name,
             unit_id,
-            msg_type or 0,
+            target_type or 0,
             button,
             event_type,
             self._button_number,
@@ -138,15 +138,15 @@ class CasambiButtonEventEntity(EventEntity):
             _LOGGER.debug("[BTN_EVENT] ignored — button %s ≠ entity button %d", button, self._button_number)
             return
 
-        # Deduplicate: PTM215B sends both 0x08 and 0x10 in the same BLE packet.
-        # Use 0x08 for press/release (correct button numbers).
-        # Use 0x10 for hold/release_after_hold (only source for these).
+        # Deduplicate: PTM215B sends both a button stream (0x06) and input stream (0x12)
+        # in the same BLE packet. Use button stream for press/release, input stream for
+        # hold/release_after_hold (only source for these events).
         if self._is_kinetic_switch():
-            if msg_type == 0x10 and event_type in ("button_press", "button_release"):
-                _LOGGER.debug("[BTN_EVENT] ignored — kinetic: 0x10 press/release is duplicate of 0x08")
+            if target_type == 0x12 and event_type in ("button_press", "button_release"):
+                _LOGGER.debug("[BTN_EVENT] ignored — kinetic: input stream press/release is duplicate of button stream")
                 return
-        elif msg_type == 0x08:
-            _LOGGER.debug("[BTN_EVENT] ignored — non-kinetic: 0x08 not used")
+        elif target_type == 0x06:
+            _LOGGER.debug("[BTN_EVENT] ignored — non-kinetic: button stream not used")
             return
 
         action = _EVENT_TO_ACTION.get(event_type)

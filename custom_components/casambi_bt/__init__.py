@@ -742,10 +742,10 @@ class CasambiApi:
         event_dict: dict = {
             "unit_id": event_data.unit_id,
             "button": event_data.button,
+            "button_event_index": event_data.button_event_index,
             "event": _BUTTON_EVENT_STRINGS.get(event_data.event, "unknown"),
-            "message_type": event_data.message_type,
+            "target_type": event_data.target_type,
             "flags": event_data.flags,
-            "action": event_data.action,
             "extra_data": event_data.extra_data,
         }
         _LOGGER.debug("Switch event received: %s", event_dict)

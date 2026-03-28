@@ -554,8 +554,12 @@ class CasambiApi:
             self.casa.registerDisconnectCallback(self._casa_disconnect)
             self.casa.registerUnitChangedHandler(self._unit_changed_handler)
 
-            # Register switch event handler if available (new in casambi-bt 0.3.0)
+            # Register switch event handler if available (new in casambi-bt 0.3.0).
+            # Unregister first to avoid accumulating duplicate handlers on reconnect.
             if hasattr(self.casa, "registerSwitchEventHandler"):
+                if hasattr(self.casa, "unregisterSwitchEventHandler"):
+                    with contextlib.suppress(Exception):
+                        self.casa.unregisterSwitchEventHandler(self._switch_event_handler)
                 self.casa.registerSwitchEventHandler(self._switch_event_handler)
             else:
                 _LOGGER.warning(

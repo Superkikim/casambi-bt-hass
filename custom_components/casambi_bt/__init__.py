@@ -736,7 +736,8 @@ class CasambiApi:
     def _switch_event_handler(self, event_data: SwitchEvent) -> None:
         """Handle switch events from the Casambi network.
 
-        Converts the lib's SwitchEvent dataclass to a plain dict before
+        Retransmission deduplication is handled at the lib level (SwitchEventDecoder).
+        This method converts the SwitchEvent dataclass to a plain dict before
         dispatching to registered callbacks.
         """
         event_dict: dict = {

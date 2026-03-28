@@ -131,18 +131,10 @@ class CasambiSwitchSensor(SensorEntity):
             _LOGGER.debug("[BTN_SENSOR] ignored — unit_id mismatch (got %s, want %s)", unit_id, self._unit.deviceId)
             return
 
-        # A single physical press on PTM215B produces both a button stream (0x06)
-        # and an input stream (0x12) frame in the same BLE packet.
-        # For kinetic (EnOcean) switches:
-        #   0x06 (button stream) → PRESS + RELEASE only (use these)
-        #   0x12 (input stream)  → all 4 event types; discard its PRESS/RELEASE (duplicates)
-        #                          but keep HOLD + RELEASE_AFTER_HOLD (only source for these)
-        # For non-kinetic switches: ignore 0x06 (button stream) entirely.
-        if self._is_kinetic_switch():
-            if target_type == 0x12 and event_type in ("button_press", "button_release"):
-                _LOGGER.debug("[BTN_SENSOR] ignored — kinetic: input stream press/release is duplicate of button stream")
-                return
-        elif target_type == 0x06:
+        # Deduplication of BLE retransmissions is handled upstream in __init__.py.
+        # Here we only filter out the 0x06 button stream for non-kinetic switches
+        # (it is unreliable for those devices).
+        if not self._is_kinetic_switch() and target_type == 0x06:
             _LOGGER.debug("[BTN_SENSOR] ignored — non-kinetic: button stream not used")
             return
 

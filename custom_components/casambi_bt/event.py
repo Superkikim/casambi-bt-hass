@@ -138,14 +138,9 @@ class CasambiButtonEventEntity(EventEntity):
             _LOGGER.debug("[BTN_EVENT] ignored — button %s ≠ entity button %d", button, self._button_number)
             return
 
-        # Deduplicate: PTM215B sends both a button stream (0x06) and input stream (0x12)
-        # in the same BLE packet. Use button stream for press/release, input stream for
-        # hold/release_after_hold (only source for these events).
-        if self._is_kinetic_switch():
-            if target_type == 0x12 and event_type in ("button_press", "button_release"):
-                _LOGGER.debug("[BTN_EVENT] ignored — kinetic: input stream press/release is duplicate of button stream")
-                return
-        elif target_type == 0x06:
+        # Deduplication of BLE retransmissions is handled upstream in __init__.py.
+        # Here we only filter out the 0x06 button stream for non-kinetic switches.
+        if not self._is_kinetic_switch() and target_type == 0x06:
             _LOGGER.debug("[BTN_EVENT] ignored — non-kinetic: button stream not used")
             return
 

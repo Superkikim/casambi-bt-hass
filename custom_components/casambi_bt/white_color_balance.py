@@ -1,7 +1,7 @@
 """White/Color balance helpers for Casambi PWM+RGB+TW light units.
 
 The WHITECOLORBALANCE control is a 6-bit value not yet decoded by
-casambi-bt-revamped (mapped to UnitControlType.UNKOWN=99).
+casambi-bt-skk (mapped to UnitControlType.UNIMPLEMENTED=98).
 
 Raw encoding — state byte layout (5 bytes):
   FF FF TT MM 21
@@ -30,7 +30,7 @@ Formula:
   WRITE: raw = round((100 - white_balance%) × 63 / 100)  clamped to [0, 63]
 
 Detection: unit must have both a UnitControlType.RGB control and a
-UnitControlType.UNKOWN control with length=6 and default=31.
+UnitControlType.UNIMPLEMENTED control with length=6 and default=31.
 
 These helpers are used by light.py (attribute + set method) and __init__.py
 (set_white_balance service handler). A number entity is also created for UI
@@ -56,7 +56,7 @@ from .entities import CasambiUnitEntity, TypedEntityDescription
 _LOGGER = logging.getLogger(__name__)
 
 # Signature that identifies a WHITECOLORBALANCE control
-# Note: c.max is None for UNKOWN controls (lib does not populate it)
+# Note: c.max is None for UNIMPLEMENTED controls (lib does not populate it)
 _WCB_LENGTH: int = 6
 _WCB_DEFAULT: int = 31  # midpoint
 _WCB_RAW_MAX: int = 63  # full 6-bit range
@@ -72,7 +72,7 @@ def _find_wcb_control(unit: Unit):
         return None
     for c in unit.unitType.controls:
         if (
-            c.type == UnitControlType.UNKOWN
+            c.type == UnitControlType.UNIMPLEMENTED
             and c.length == _WCB_LENGTH
             and c.default == _WCB_DEFAULT
         ):

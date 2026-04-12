@@ -34,7 +34,7 @@ _LOGGER = logging.getLogger(__name__)
 #   bit  14     (1 bit)   → reserved / unknown flag
 #
 # The mode string "DALI Sensor{Presence,Daylight}" contains element names
-# that match the UNKOWN controls in order. The library maps these into
+# that match the UNKNOWN controls in order. The library maps these into
 # unit.state.sensors: {"Presence": value, "Daylight": value}.
 
 _PRESENCE_KEY = "Presence"

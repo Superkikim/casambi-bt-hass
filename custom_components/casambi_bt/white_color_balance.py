@@ -1,36 +1,22 @@
 """White/Color balance helpers for Casambi PWM+RGB+TW light units.
 
-The WHITECOLORBALANCE control is a 6-bit value not yet decoded by
-casambi-bt-skk (mapped to UnitControlType.UNIMPLEMENTED=98).
+The WHITECOLORBALANCE control is a 6-bit cross-fade value decoded natively by
+casambi-bt-skk>=0.4.0b2.post6 as UnitControlType.WHITECOLORBALANCE.
 
-Raw encoding — state byte layout (5 bytes):
-  FF FF TT MM 21
-    TT = tint/hue byte (do not modify)
-    MM = balance byte  = (tint_offset & 0x03) | (raw << 2)
-    21 = device constant (do not modify)
+Raw encoding:
+  raw ∈ [0..63]  (6-bit value)
+  raw  0 = pure white channel
+  raw 63 = pure color channel
 
-  raw ∈ [0..63]  (64 discrete steps)
-  tint_offset = MM & 0x03  (lower 2 bits; preserves TT context)
-  raw         = (MM >> 2) & 0x3F  ← what _read_bits(state, offset=26, length=6) extracts
-
-Calibrated bi-linear model (Casambi Sensor Platform / Véranda LED type 19803):
-  raw  0      →  White=100%  Color=  0%
-  raw  0-31   →  White=100% fixed,  Color = raw/31 × 100%
-  raw 31      →  White=100%  Color=100%  (factory default — both channels max)
-  raw 31-63   →  Color=100% fixed, White = (63-raw)/32 × 100%
-  raw 63      →  White=  0%  Color=100%
-
-HA attribute white_balance (0-100%):
+HA attribute white_balance (0–100%):
   100% = raw  0 = pure White
     0% = raw 63 = pure Color
-  ~50% = raw 31 = centre (both channels maxed)
 
 Formula:
   READ : white_balance% = round((63 - raw) × 100 / 63)
   WRITE: raw = round((100 - white_balance%) × 63 / 100)  clamped to [0, 63]
 
-Detection: unit must have both a UnitControlType.RGB control and a
-UnitControlType.UNIMPLEMENTED control with length=6 and default=31.
+Detection: unit must have a UnitControlType.WHITECOLORBALANCE control.
 
 These helpers are used by light.py (attribute + set method) and __init__.py
 (set_white_balance service handler). A number entity is also created for UI
@@ -42,7 +28,7 @@ from __future__ import annotations
 import logging
 from typing import cast
 
-from CasambiBt import Unit, UnitControl, UnitControlType
+from CasambiBt import Unit, UnitControlType
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
@@ -55,34 +41,15 @@ from .entities import CasambiUnitEntity, TypedEntityDescription
 
 _LOGGER = logging.getLogger(__name__)
 
-# Signature that identifies a WHITECOLORBALANCE control
-# Note: c.max is None for UNIMPLEMENTED controls (lib does not populate it)
-_WCB_LENGTH: int = 6
-_WCB_DEFAULT: int = 31  # midpoint
 _WCB_RAW_MAX: int = 63  # full 6-bit range
 
 
 # ── Detection ─────────────────────────────────────────────────────────────────
 
 
-def _find_wcb_control(unit: Unit):
-    """Return the WHITECOLORBALANCE control for the unit, or None if absent."""
-    has_rgb = any(c.type == UnitControlType.RGB for c in unit.unitType.controls)
-    if not has_rgb:
-        return None
-    for c in unit.unitType.controls:
-        if (
-            c.type == UnitControlType.UNIMPLEMENTED
-            and c.length == _WCB_LENGTH
-            and c.default == _WCB_DEFAULT
-        ):
-            return c
-    return None
-
-
 def _is_white_color_balance_unit(unit: Unit) -> bool:
     """Return True for units that carry a WHITECOLORBALANCE control."""
-    return _find_wcb_control(unit) is not None
+    return unit.unitType.get_control(UnitControlType.WHITECOLORBALANCE) is not None
 
 
 # ── Platform setup ────────────────────────────────────────────────────────────
@@ -115,13 +82,10 @@ class CasambiWhiteColorBalance(CasambiUnitEntity, NumberEntity):
 
     100% = raw  0 = pure White
       0% = raw 63 = pure Color
-    ~50% = raw 31 = centre (both channels maxed — factory default)
     """
 
     def __init__(self, api: CasambiApi, unit: Unit) -> None:
         """Initialize a White balance number entity for the given unit."""
-        ctrl = _find_wcb_control(unit)
-        self._ctrl: UnitControl = ctrl
         desc = TypedEntityDescription(
             key=unit.uuid,
             translation_key="white_balance",
@@ -139,15 +103,9 @@ class CasambiWhiteColorBalance(CasambiUnitEntity, NumberEntity):
     def native_value(self) -> float | None:
         """Return the current white balance as %."""
         unit = cast("Unit", self._obj)
-        if unit.state is None:
+        if unit.state is None or unit.state.white_balance is None:
             return None
-        entry = next(
-            (v for o, _l, v in unit.state.unknown_controls if o == self._ctrl.offset),
-            None,
-        )
-        if entry is None:
-            return None
-        return round((_WCB_RAW_MAX - entry) * 100 / _WCB_RAW_MAX)
+        return round((_WCB_RAW_MAX - unit.state.white_balance) * 100 / _WCB_RAW_MAX)
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the white balance from a percentage."""
@@ -155,4 +113,4 @@ class CasambiWhiteColorBalance(CasambiUnitEntity, NumberEntity):
         raw_val = max(
             0, min(_WCB_RAW_MAX, round(_WCB_RAW_MAX - value * _WCB_RAW_MAX / 100))
         )
-        await self._api.casa.setControlValue(unit, self._ctrl, raw_val)
+        await self._api.casa.setWhiteColorBalance(unit, raw_val)

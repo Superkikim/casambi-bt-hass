@@ -7,7 +7,7 @@ from copy import copy
 import logging
 from typing import Any, Final, cast
 
-from CasambiBt import ColorSource, Group, Unit, UnitControl, UnitControlType, UnitState
+from CasambiBt import ColorSource, Group, Unit, UnitControlType, UnitState
 from CasambiBt.errors import ProtocolError
 
 from homeassistant.components.light import (
@@ -32,7 +32,7 @@ from .entities import (
     CasambiUnitEntity,
     TypedEntityDescription,
 )
-from .white_color_balance import _WCB_RAW_MAX, _find_wcb_control
+from .white_color_balance import _WCB_RAW_MAX
 
 CASA_LIGHT_CTRL_TYPES: Final[list[UnitControlType]] = [
     UnitControlType.DIMMER,
@@ -169,8 +169,6 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
             self._attr_min_color_temp_kelvin = temp_control.min
             self._attr_max_color_temp_kelvin = temp_control.max
 
-        self._wcb_ctrl: UnitControl | None = _find_wcb_control(unit)
-
         desc = TypedEntityDescription(key=unit.uuid, name=None, entity_type="light")
 
         self._obj: Unit
@@ -228,28 +226,20 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return white_balance (0-100%) for RGB+TW units that have a WCB control."""
-        if self._wcb_ctrl is None:
-            return {}
         unit = cast("Unit", self._obj)
-        if unit.state is None:
+        if unit.state is None or unit.state.white_balance is None:
             return {}
-        entry = next(
-            (v for o, _l, v in unit.state.unknown_controls if o == self._wcb_ctrl.offset),
-            None,
-        )
-        if entry is None:
-            return {}
-        return {"white_balance": round((_WCB_RAW_MAX - entry) * 100 / _WCB_RAW_MAX)}
+        return {"white_balance": round((_WCB_RAW_MAX - unit.state.white_balance) * 100 / _WCB_RAW_MAX)}
 
     async def async_set_white_balance(self, value: float) -> None:
-        """Set the white balance (0-100%) via setControlValue."""
-        if self._wcb_ctrl is None:
-            return
+        """Set the white balance (0-100%) via setWhiteColorBalance."""
         unit = cast("Unit", self._obj)
+        if unit.unitType.get_control(UnitControlType.WHITECOLORBALANCE) is None:
+            return
         raw_val = max(
             0, min(_WCB_RAW_MAX, round(_WCB_RAW_MAX - value * _WCB_RAW_MAX / 100))
         )
-        await self._api.casa.setControlValue(unit, self._wcb_ctrl, raw_val)
+        await self._api.casa.setWhiteColorBalance(unit, raw_val)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the unit."""

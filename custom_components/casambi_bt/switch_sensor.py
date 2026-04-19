@@ -113,15 +113,15 @@ class CasambiSwitchSensor(SensorEntity):
     def _handle_switch_event(self, event_data: dict[str, Any]) -> None:
         """Handle incoming switch events."""
         unit_id = event_data.get("unit_id")
-        target_type = event_data.get("target_type")
+        message_type = event_data.get("message_type")
         event_type = event_data.get("event")
         button = event_data.get("button")
 
         _LOGGER.debug(
-            "[BTN_SENSOR] raw event: unit=%s unit_id=%s target_type=0x%02x button=%s event=%s flags=0x%04x",
+            "[BTN_SENSOR] raw event: unit=%s unit_id=%s message_type=0x%02x button=%s event=%s flags=0x%04x",
             self._unit.name,
             unit_id,
-            target_type or 0,
+            message_type or 0,
             button,
             event_type,
             event_data.get("flags") or 0,
@@ -131,19 +131,18 @@ class CasambiSwitchSensor(SensorEntity):
             _LOGGER.debug("[BTN_SENSOR] ignored — unit_id mismatch (got %s, want %s)", unit_id, self._unit.deviceId)
             return
 
-        # Deduplication of BLE retransmissions is handled upstream in __init__.py.
-        # Here we only filter out the 0x06 button stream for non-kinetic switches
-        # (it is unreliable for those devices).
-        if not self._is_kinetic_switch() and target_type == 0x06:
-            _LOGGER.debug("[BTN_SENSOR] ignored — non-kinetic: button stream not used")
+        # Deduplication of BLE retransmissions is handled by the lib (SwitchEventDecoder).
+        # message_type 0x10 is kinetic-switch-specific; filter it for non-kinetic devices.
+        if not self._is_kinetic_switch() and message_type == 0x10:
+            _LOGGER.debug("[BTN_SENSOR] ignored — non-kinetic: 0x10 kinetic stream not used")
             return
 
         _LOGGER.debug(
-            "[BTN_SENSOR] accepted: %s button=%s event=%s target_type=0x%02x → firing casambi_bt_button_event",
+            "[BTN_SENSOR] accepted: %s button=%s event=%s message_type=0x%02x → firing casambi_bt_button_event",
             self._unit.name,
             button,
             event_type,
-            target_type or 0,
+            message_type or 0,
         )
 
         self._last_event_data = event_data

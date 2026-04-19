@@ -39,6 +39,8 @@ _LOGGER = logging.getLogger(__name__)
 
 _PRESENCE_KEY = "Presence"
 _LUX_KEY = "Daylight"
+_PRESENCE_IDX = 0  # unknown_controls[0] → (0, 2, presence_value)
+_LUX_IDX = 1       # unknown_controls[1] → (2, 12, lux_value)
 
 
 def _is_dali2_sensor(unit: Unit) -> bool:
@@ -135,7 +137,14 @@ class CasambiDali2LuxSensor(CasambiUnitEntity, SensorEntity):
         unit = cast("Unit", self._obj)
         if unit.state is None:
             return None
-        return unit.state.sensors.get(_LUX_KEY)
+        val = unit.state.sensors.get(_LUX_KEY)
+        if val is not None:
+            return val
+        # Fallback: positional access when element_names didn't parse the mode string
+        controls = unit.state.unknown_controls
+        if controls and len(controls) > _LUX_IDX:
+            return controls[_LUX_IDX][2]
+        return None
 
 
 class CasambiDali2PresenceSensor(CasambiUnitEntity, BinarySensorEntity):
@@ -159,5 +168,10 @@ class CasambiDali2PresenceSensor(CasambiUnitEntity, BinarySensorEntity):
             return None
         presence = unit.state.sensors.get(_PRESENCE_KEY)
         if presence is None:
-            return None
+            # Fallback: positional access when element_names didn't parse the mode string
+            controls = unit.state.unknown_controls
+            if controls and len(controls) > _PRESENCE_IDX:
+                presence = controls[_PRESENCE_IDX][2]
+            else:
+                return None
         return presence != 0

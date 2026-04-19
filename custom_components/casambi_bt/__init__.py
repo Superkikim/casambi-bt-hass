@@ -747,9 +747,9 @@ class CasambiApi:
         event_dict: dict = {
             "unit_id": event_data.unit_id,
             "button": event_data.button,
-            "button_event_index": event_data.button_event_index,
+            "action": event_data.action,
             "event": _BUTTON_EVENT_STRINGS.get(event_data.event, "unknown"),
-            "target_type": event_data.target_type,
+            "message_type": event_data.message_type,
             "flags": event_data.flags,
             "extra_data": event_data.extra_data,
         }

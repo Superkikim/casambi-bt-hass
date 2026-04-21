@@ -26,22 +26,6 @@ from .entities import CasambiUnitEntity, TypedEntityDescription
 
 _LOGGER = logging.getLogger(__name__)
 
-# State encoding (reverse-engineered from BLE traffic, 2026-03-13):
-#
-# The unit state is a 16-bit little-endian value:
-#   bits  0– 1  (2 bits)  → presence  (0 = absent, 1 = present)
-#   bits  2–13  (12 bits) → daylight in lux
-#   bit  14     (1 bit)   → reserved / unknown flag
-#
-# The mode string "DALI Sensor{Presence,Daylight}" contains element names
-# that match the UNKNOWN controls in order. The library maps these into
-# unit.state.sensors: {"Presence": value, "Daylight": value}.
-
-_PRESENCE_KEY = "Presence"
-_LUX_KEY = "Daylight"
-_PRESENCE_IDX = 0  # unknown_controls[0] → (0, 2, presence_value)
-_LUX_IDX = 1       # unknown_controls[1] → (2, 12, lux_value)
-
 
 def _is_dali2_sensor(unit: Unit) -> bool:
     """Return True if unit is a DALI-2 Sensor{Presence,Daylight}."""
@@ -133,18 +117,11 @@ class CasambiDali2LuxSensor(CasambiUnitEntity, SensorEntity):
 
     @property
     def native_value(self) -> int | None:
-        """Return lux value from the library's named sensor readings."""
+        """Return lux value from the library's typed lux property."""
         unit = cast("Unit", self._obj)
         if unit.state is None:
             return None
-        val = unit.state.sensors.get(_LUX_KEY)
-        if val is not None:
-            return val
-        # Fallback: positional access when element_names didn't parse the mode string
-        controls = unit.state.unknown_controls
-        if controls and len(controls) > _LUX_IDX:
-            return controls[_LUX_IDX][2]
-        return None
+        return unit.state.lux
 
 
 class CasambiDali2PresenceSensor(CasambiUnitEntity, BinarySensorEntity):
@@ -166,12 +143,6 @@ class CasambiDali2PresenceSensor(CasambiUnitEntity, BinarySensorEntity):
         unit = cast("Unit", self._obj)
         if unit.state is None:
             return None
-        presence = unit.state.sensors.get(_PRESENCE_KEY)
-        if presence is None:
-            # Fallback: positional access when element_names didn't parse the mode string
-            controls = unit.state.unknown_controls
-            if controls and len(controls) > _PRESENCE_IDX:
-                presence = controls[_PRESENCE_IDX][2]
-            else:
-                return None
-        return presence != 0
+        if unit.state.presence is None:
+            return None
+        return unit.state.presence != 0

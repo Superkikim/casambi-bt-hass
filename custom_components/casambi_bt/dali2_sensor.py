@@ -6,6 +6,7 @@ import logging
 from typing import cast
 
 from CasambiBt import Unit
+from CasambiBt._unit import UnitControlType
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -28,8 +29,11 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _is_dali2_sensor(unit: Unit) -> bool:
-    """Return True if unit is a DALI-2 Sensor{Presence,Daylight}."""
-    return unit.unitType.mode.startswith("DALI Sensor")
+    """Return True if unit exposes PRESENCE or LUX controls."""
+    return (
+        unit.unitType.get_control(UnitControlType.PRESENCE) is not None
+        or unit.unitType.get_control(UnitControlType.LUX) is not None
+    )
 
 
 async def async_setup_entry_dali2_sensors(

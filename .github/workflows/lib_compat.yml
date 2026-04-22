@@ -1,0 +1,32 @@
+name: Lib compatibility
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  compat:
+    runs-on: ubuntu-latest
+    name: lib compat check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lib from manifest.json
+        run: |
+          LIB=$(python3 -c "
+          import json
+          m = json.load(open('custom_components/casambi_bt/manifest.json'))
+          casambi_req = [r for r in m['requirements'] if 'casambi' in r.lower()][0]
+          print(casambi_req)
+          ")
+          echo "Installing: $LIB"
+          pip install "$LIB"
+
+      - name: Run compatibility tests
+        run: |
+          pip install pytest
+          pytest tests/test_lib_compat.py -v

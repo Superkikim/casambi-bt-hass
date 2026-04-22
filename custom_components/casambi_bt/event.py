@@ -118,15 +118,15 @@ class CasambiButtonEventEntity(EventEntity):
     def _handle_switch_event(self, event_data: dict[str, Any]) -> None:
         """Handle incoming switch event dict from CasambiApi."""
         unit_id = event_data.get("unit_id")
-        message_type = event_data.get("message_type")
+        target_type = event_data.get("target_type")
         event_type = event_data.get("event", "unknown")
         button = event_data.get("button")
 
         _LOGGER.debug(
-            "[BTN_EVENT] raw: unit=%s unit_id=%s message_type=0x%02x button=%s event=%s → entity Button %d",
+            "[BTN_EVENT] raw: unit=%s unit_id=%s target_type=0x%02x button=%s event=%s → entity Button %d",
             self._unit.name,
             unit_id,
-            message_type or 0,
+            target_type or 0,
             button,
             event_type,
             self._button_number,
@@ -136,12 +136,6 @@ class CasambiButtonEventEntity(EventEntity):
             return
         if button != self._button_number:
             _LOGGER.debug("[BTN_EVENT] ignored — button %s ≠ entity button %d", button, self._button_number)
-            return
-
-        # Deduplication of BLE retransmissions is handled by the lib (SwitchEventDecoder).
-        # message_type 0x10 is kinetic-switch-specific; filter it for non-kinetic devices.
-        if not self._is_kinetic_switch() and message_type == 0x10:
-            _LOGGER.debug("[BTN_EVENT] ignored — non-kinetic: 0x10 kinetic stream not used")
             return
 
         action = _EVENT_TO_ACTION.get(event_type)

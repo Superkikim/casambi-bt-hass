@@ -78,9 +78,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "unit_id": event.get("unit_id"),
                 "button": event.get("button"),
                 "event": event.get("event"),
-                "message_type": event.get("message_type"),
+                "target_type": event.get("target_type"),
                 "flags": event.get("flags"),
-                "action": event.get("action"),
+                "button_event_index": event.get("button_event_index"),
                 "extra_data": extra_data.hex() if isinstance(extra_data, bytes) else extra_data,
             },
         )
@@ -747,9 +747,9 @@ class CasambiApi:
         event_dict: dict = {
             "unit_id": event_data.unit_id,
             "button": event_data.button,
-            "action": event_data.action,
+            "button_event_index": event_data.button_event_index,
             "event": _BUTTON_EVENT_STRINGS.get(event_data.event, "unknown"),
-            "message_type": event_data.message_type,
+            "target_type": event_data.target_type,
             "flags": event_data.flags,
             "extra_data": event_data.extra_data,
         }

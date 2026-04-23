@@ -74,8 +74,10 @@ async def async_setup_entry(
             unit.name,
             unit.deviceId,
         )
-        for packet_type in _NUMERIC_SPECS:
-            entities.append(CasambiEnvironmentSensor(casa_api, unit, packet_type))
+        entities.extend(
+            CasambiEnvironmentSensor(casa_api, unit, packet_type)
+            for packet_type in _NUMERIC_SPECS
+        )
 
     _LOGGER.info("Creating %d numeric environment sensor entities", len(entities))
     if entities:
@@ -95,10 +97,10 @@ async def async_setup_entry_binary_sensors(
         if not _is_sensor_platform(unit):
             continue
 
-        for packet_type in _BINARY_SPECS:
-            entities.append(
-                CasambiEnvironmentBinarySensor(casa_api, unit, packet_type)
-            )
+        entities.extend(
+            CasambiEnvironmentBinarySensor(casa_api, unit, packet_type)
+            for packet_type in _BINARY_SPECS
+        )
 
     _LOGGER.info("Creating %d binary environment sensor entities", len(entities))
     if entities:

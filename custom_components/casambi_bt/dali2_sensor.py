@@ -29,8 +29,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _is_dali2_sensor(unit: Unit) -> bool:
-    """Return True if unit exposes PRESENCE or LUX controls."""
-    return (
+    """Return True if unit is a DALI-2 sensor with PRESENCE or LUX controls."""
+    return not unit.unitType.mode.startswith("EXT/Elements") and (
         unit.unitType.get_control(UnitControlType.PRESENCE) is not None
         or unit.unitType.get_control(UnitControlType.LUX) is not None
     )

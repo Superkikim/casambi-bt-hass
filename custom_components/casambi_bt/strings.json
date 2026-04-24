@@ -1,8 +1,9 @@
 {
   "entity": {
     "binary_sensor": {
-      "rain": { "name": "Rain" },
-      "pir":  { "name": "Motion" }
+      "rain":           { "name": "Rain" },
+      "pir":            { "name": "Motion" },
+      "dali2_presence": { "name": "Presence" }
     },
     "button": {
       "lamel_startstop": { "name": "Start / Stop" }
@@ -16,6 +17,7 @@
     "sensor": {
       "wind":              { "name": "Wind" },
       "solar":             { "name": "Solar radiation" },
+      "dali2_lux":         { "name": "Daylight" },
       "lamel_temperature": { "name": "Module temperature" }
     }
   },

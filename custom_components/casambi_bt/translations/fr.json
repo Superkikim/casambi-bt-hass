@@ -4,12 +4,19 @@
             "rain": { "name": "Pluie" },
             "pir":  { "name": "Mouvement" }
         },
+        "button": {
+            "lamel_startstop": { "name": "Commencer / Arrêter" }
+        },
         "number": {
-            "white_balance": { "name": "Balance des blancs" }
+            "white_balance":    { "name": "Balance des blancs" },
+            "lamel_shadow_sun": { "name": "Ombre / Soleil" },
+            "lamel_tilt":       { "name": "Position des louvres" },
+            "lamel_coolwarm":   { "name": "Froid / Chaud" }
         },
         "sensor": {
-            "wind":  { "name": "Vent" },
-            "solar": { "name": "Ensoleillement" }
+            "wind":              { "name": "Vent" },
+            "solar":             { "name": "Ensoleillement" },
+            "lamel_temperature": { "name": "Température module" }
         }
     },
     "config": {

@@ -242,7 +242,7 @@ class CasambiLamelToggleButton(CasambiUnitEntity, ButtonEntity):
         """Initialise the Commencer/Arrêter toggle button for the given unit."""
         desc = TypedEntityDescription(
             key=unit.uuid,
-            name="Commencer/Arrêter",
+            translation_key="lamel_startstop",
             entity_type="lamel-startstop",
         )
         super().__init__(api, desc, unit)
@@ -266,7 +266,7 @@ class CasambiLamelShadowSun(CasambiUnitEntity, NumberEntity):
         """Initialise the Shadow/Sun number entity for the given unit."""
         desc = TypedEntityDescription(
             key=unit.uuid,
-            name="Ombre / Soleil",
+            translation_key="lamel_shadow_sun",
             entity_type="lamel-shadow-sun",
         )
         super().__init__(api, desc, unit)
@@ -301,7 +301,7 @@ class CasambiLamelTiltDegrees(CasambiUnitEntity, NumberEntity):
         """Initialise the louvre tilt-angle number entity for the given unit."""
         desc = TypedEntityDescription(
             key=unit.uuid,
-            name="Position des louvres",
+            translation_key="lamel_tilt",
             entity_type="lamel-tilt-degrees",
         )
         super().__init__(api, desc, unit)
@@ -336,7 +336,7 @@ class CasambiLamelCoolWarm(CasambiUnitEntity, NumberEntity):
         """Initialise the Cool/Warm temperature-setpoint number entity for the given unit."""
         desc = TypedEntityDescription(
             key=unit.uuid,
-            name="Froid/Chaud",
+            translation_key="lamel_coolwarm",
             entity_type="lamel-coolwarm",
         )
         super().__init__(api, desc, unit)
@@ -378,7 +378,7 @@ class CasambiLamelTemperature(CasambiUnitEntity, SensorEntity):
         """Initialise the internal-temperature sensor entity for the given unit."""
         desc = TypedEntityDescription(
             key=unit.uuid,
-            name="Température module",
+            translation_key="lamel_temperature",
             entity_type="lamel-temperature",
         )
         super().__init__(api, desc, unit)

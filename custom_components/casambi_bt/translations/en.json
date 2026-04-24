@@ -5,13 +5,20 @@
             "pir":            { "name": "Motion" },
             "dali2_presence": { "name": "Presence" }
         },
+        "button": {
+            "lamel_startstop": { "name": "Start / Stop" }
+        },
         "number": {
-            "white_balance": { "name": "White balance" }
+            "white_balance":    { "name": "White balance" },
+            "lamel_shadow_sun": { "name": "Shadow / Sun" },
+            "lamel_tilt":       { "name": "Louvre position" },
+            "lamel_coolwarm":   { "name": "Cool / Warm" }
         },
         "sensor": {
-            "wind":      { "name": "Wind" },
-            "solar":     { "name": "Solar radiation" },
-            "dali2_lux": { "name": "Daylight" }
+            "wind":              { "name": "Wind" },
+            "solar":             { "name": "Solar radiation" },
+            "dali2_lux":         { "name": "Daylight" },
+            "lamel_temperature": { "name": "Module temperature" }
         }
     },
     "config": {

@@ -4,12 +4,19 @@
             "rain": { "name": "Regen" },
             "pir":  { "name": "Beweging" }
         },
+        "button": {
+            "lamel_startstop": { "name": "Start / Stop" }
+        },
         "number": {
-            "white_balance": { "name": "Witbalans" }
+            "white_balance":    { "name": "Witbalans" },
+            "lamel_shadow_sun": { "name": "Schaduw / Zon" },
+            "lamel_tilt":       { "name": "Positie lamellen" },
+            "lamel_coolwarm":   { "name": "Koel / Warm" }
         },
         "sensor": {
-            "wind":  { "name": "Wind" },
-            "solar": { "name": "Zonnestraling" }
+            "wind":              { "name": "Wind" },
+            "solar":             { "name": "Zonnestraling" },
+            "lamel_temperature": { "name": "Module temperatuur" }
         }
     },
     "config": {

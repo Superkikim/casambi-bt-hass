@@ -4,12 +4,19 @@
             "rain": { "name": "Pioggia" },
             "pir":  { "name": "Movimento" }
         },
+        "button": {
+            "lamel_startstop": { "name": "Avvia / Arresta" }
+        },
         "number": {
-            "white_balance": { "name": "Bilanciamento del bianco" }
+            "white_balance":    { "name": "Bilanciamento del bianco" },
+            "lamel_shadow_sun": { "name": "Ombra / Sole" },
+            "lamel_tilt":       { "name": "Posizione lamelle" },
+            "lamel_coolwarm":   { "name": "Fresco / Caldo" }
         },
         "sensor": {
-            "wind":  { "name": "Vento" },
-            "solar": { "name": "Radiazione solare" }
+            "wind":              { "name": "Vento" },
+            "solar":             { "name": "Radiazione solare" },
+            "lamel_temperature": { "name": "Temperatura modulo" }
         }
     },
     "config": {

@@ -9,7 +9,6 @@
       "lamel_startstop": { "name": "Start / Stop" }
     },
     "number": {
-      "white_balance":    { "name": "White balance" },
       "lamel_shadow_sun": { "name": "Shadow / Sun" },
       "lamel_tilt":       { "name": "Louvre position" },
       "lamel_coolwarm":   { "name": "Cool / Warm" }

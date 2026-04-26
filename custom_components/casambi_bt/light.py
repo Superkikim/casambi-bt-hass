@@ -124,7 +124,7 @@ class CasambiLight(CasambiEntity, LightEntity, metaclass=ABCMeta):
             and UnitControlType.WHITECOLORBALANCE in unit_modes
             and UnitControlType.TEMPERATURE in unit_modes
         ):
-            return {ColorMode.RGBWW}
+            return {ColorMode.RGBWW, ColorMode.COLOR_TEMP}
 
         if UnitControlType.RGB in unit_modes and UnitControlType.WHITE in unit_modes:
             supported.add(ColorMode.RGBW)
@@ -233,6 +233,19 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
         if unit.state is not None:
             return unit.state.xy
         return None
+
+    @property
+    def color_mode(self) -> str:
+        """Return current color mode, switching between RGBWW and COLOR_TEMP based on colorsource."""
+        unit = cast("Unit", self._obj)
+        if (
+            ColorMode.RGBWW in self._attr_supported_color_modes
+            and ColorMode.COLOR_TEMP in self._attr_supported_color_modes
+            and unit.state is not None
+            and unit.state.colorsource == ColorSource.TEMPERATURE
+        ):
+            return ColorMode.COLOR_TEMP
+        return self._mode_helper(self._attr_supported_color_modes)
 
     @property
     def rgbww_color(self) -> tuple[int, int, int, int, int] | None:

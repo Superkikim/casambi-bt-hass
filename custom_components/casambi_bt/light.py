@@ -249,25 +249,26 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
 
     @property
     def rgbww_color(self) -> tuple[int, int, int, int, int] | None:
-        """Return the RGBWW color value for RGB+WCB+TW units."""
+        """Return the RGBWW color value for RGB+WCB+TW units.
+
+        RGB channels carry the stored color (raw state.rgb, independent of WCB).
+        CW/WW carry the effective white level derived from WCB and temperature.
+        This matches HA's expectation of independent, non-brightness-normalized channels.
+        """
         unit = cast("Unit", self._obj)
         if unit.state is None or unit.state.rgb is None:
             return None
         r, g, b = unit.state.rgb
         wcb_raw = unit.state.white_balance if unit.state.white_balance is not None else _WCB_RAW_MAX
-        rgb_scale = wcb_raw / _WCB_RAW_MAX
-        wcb_frac = 1.0 - rgb_scale
+        white_frac = 1.0 - (wcb_raw / _WCB_RAW_MAX)  # 0=no white (wcb=63), 1=full white (wcb=0)
+        white_total = round(255 * white_frac)
         temp = unit.state.temperature
         min_k = self._attr_min_color_temp_kelvin or 2700
         max_k = self._attr_max_color_temp_kelvin or 6500
         temp_norm = (temp - min_k) / (max_k - min_k) if temp is not None and max_k > min_k else 0.5
-        return (
-            round(r * rgb_scale),
-            round(g * rgb_scale),
-            round(b * rgb_scale),
-            round(255 * wcb_frac * temp_norm),
-            round(255 * wcb_frac * (1.0 - temp_norm)),
-        )
+        cw = round(white_total * temp_norm)
+        ww = white_total - cw
+        return (r, g, b, cw, ww)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the unit."""
@@ -286,18 +287,12 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
         if ATTR_RGBWW_COLOR in kwargs:
             r, g, b, cw, ww = kwargs[ATTR_RGBWW_COLOR]
             state.rgb = (r, g, b)
-            max_rgb = max(r, g, b)
-            max_white = max(cw, ww)
-            state.white_balance = (
-                round(_WCB_RAW_MAX * max_rgb / (max_rgb + max_white))
-                if (max_rgb + max_white) > 0
-                else _WCB_RAW_MAX
-            )
-            white_sum = cw + ww
-            if white_sum > 0:
+            white_total = min(cw + ww, 255)
+            state.white_balance = round(_WCB_RAW_MAX * (1.0 - white_total / 255))
+            if cw + ww > 0:
                 min_k = self._attr_min_color_temp_kelvin or 2700
                 max_k = self._attr_max_color_temp_kelvin or 6500
-                state.temperature = round(min_k + (cw / white_sum) * (max_k - min_k))
+                state.temperature = round(min_k + (cw / (cw + ww)) * (max_k - min_k))
             state.colorsource = ColorSource.RGB
             set_state = True
         if ATTR_RGBW_COLOR in kwargs:
@@ -397,13 +392,8 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
                 was_set = True
             elif ATTR_RGBWW_COLOR in kwargs:
                 r, g, b, cw, ww = kwargs[ATTR_RGBWW_COLOR]
-                max_rgb = max(r, g, b)
-                max_white = max(cw, ww)
-                wcb_raw = (
-                    round(_WCB_RAW_MAX * max_rgb / (max_rgb + max_white))
-                    if (max_rgb + max_white) > 0
-                    else _WCB_RAW_MAX
-                )
+                white_total = min(cw + ww, 255)
+                wcb_raw = round(_WCB_RAW_MAX * (1.0 - white_total / 255))
                 _LOGGER.debug(
                     "Classic fallback: setColor+setWhiteColorBalance unit=%i rgb=%s wcb=%s",
                     unit.deviceId,
@@ -412,11 +402,10 @@ class CasambiLightUnit(CasambiLight, CasambiUnitEntity):
                 )
                 await self._api.casa.setColor(unit, (r, g, b))
                 await self._api.casa.setWhiteColorBalance(unit, wcb_raw)
-                white_sum = cw + ww
-                if white_sum > 0:
+                if cw + ww > 0:
                     min_k = self._attr_min_color_temp_kelvin or 2700
                     max_k = self._attr_max_color_temp_kelvin or 6500
-                    temp = round(min_k + (cw / white_sum) * (max_k - min_k))
+                    temp = round(min_k + (cw / (cw + ww)) * (max_k - min_k))
                     await self._api.casa.setTemperature(unit, temp)
                 was_set = True
             elif ATTR_RGBW_COLOR in kwargs:

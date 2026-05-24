@@ -166,6 +166,15 @@ class CasambiEnvironmentSensor(CasambiUnitEntity, SensorEntity):
         return None
 
     @property
+    def available(self) -> bool:
+        """Return True whenever the API is connected.
+
+        Passive BLE broadcasters (Sensor Platform V4) always report online=False
+        in the Casambi mesh protocol, so we bypass the unit.online check.
+        """
+        return self._api.available
+
+    @property
     def native_value(self) -> int | None:
         """Return this sensor's most recently received value from the library cache."""
         unit = cast("Unit", self._obj)
@@ -208,6 +217,15 @@ class CasambiEnvironmentBinarySensor(CasambiUnitEntity, BinarySensorEntity):
         self._on_threshold = threshold
         self._attr_icon = icon
         self._attr_device_class = device_class
+
+    @property
+    def available(self) -> bool:
+        """Return True whenever the API is connected.
+
+        Passive BLE broadcasters (Sensor Platform V4) always report online=False
+        in the Casambi mesh protocol, so we bypass the unit.online check.
+        """
+        return self._api.available
 
     @property
     def is_on(self) -> bool | None:

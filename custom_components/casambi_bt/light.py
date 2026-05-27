@@ -73,6 +73,20 @@ def _is_cover_unit(unit: Unit) -> bool:
     )
 
 
+def _is_sensor_platform_unit(unit: Unit) -> bool:
+    """Return True if the unit is a Sensor Platform (EXT/Elements without DIMMER).
+
+    These units carry ONOFF controls but must not be exposed as lights.
+    Their sensor data is handled by environment_sensor.py instead.
+    """
+    controls = {c.type for c in unit.unitType.controls}
+    return (
+        unit.unitType.mode.startswith("EXT/Elements")
+        and UnitControlType.SENSOR in controls
+        and UnitControlType.DIMMER not in controls
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -81,12 +95,11 @@ async def async_setup_entry(
     """Create the Casambi light entities."""
     casa_api: CasambiApi = hass.data[DOMAIN][config_entry.entry_id]
 
-    # Exclude motor-driven covers from the light platform.
-    # Uses the same discriminator as cover.py to avoid false exclusions.
+    # Exclude motor-driven covers and EXT/Elements sensor platforms from the light platform.
     light_entities: list[CasambiLight] = [
         CasambiLightUnit(casa_api, u)
         for u in casa_api.get_units(CASA_LIGHT_CTRL_TYPES)
-        if not _is_cover_unit(u)
+        if not _is_cover_unit(u) and not _is_sensor_platform_unit(u)
     ]
 
     group_entities: list[CasambiLight] = []

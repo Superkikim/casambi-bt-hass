@@ -650,7 +650,7 @@ class CasambiApi:
                 _LOGGER.debug(
                     "Timeout while cancelling reconnect as part of disconnect."
                 )
-            except Exception:  # noqa: BLE001
+            except HomeAssistantError:
                 _LOGGER.debug(
                     "Got exception when cancelling reconnect. Ignoring.",
                     exc_info=True,

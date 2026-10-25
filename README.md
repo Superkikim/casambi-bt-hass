@@ -25,7 +25,7 @@ An enhanced fork of the [original Casambi Bluetooth integration](https://github.
 - **Localization** - Full translations for French (fr), Italian (it), German (de), and Dutch (nl)
 - **Automation blueprints** - Ready-to-use blueprints for button automations
 - **Fixed relay status** - Properly reports the status of relay units (also merged to the original integration)
-- **Based on casambi-bt-revamped** - Uses an enhanced version of the underlying library (protocol-level INVOCATION parsing)
+- **Based on casambi-bt-skk** - Tracks the upstream `casambi-bt` development branch while retaining a separate package for integration testing
 
 ## Quick Start
 

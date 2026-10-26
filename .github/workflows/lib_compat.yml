@@ -16,6 +16,8 @@ jobs:
           python-version: "3.12"
 
       - name: Install lib from manifest.json
+        timeout-minutes: 10
+        shell: bash
         run: |
           LIB=$(python3 -c "
           import json
@@ -24,7 +26,19 @@ jobs:
           print(casambi_req)
           ")
           echo "Installing: $LIB"
-          pip install "$LIB"
+          # Newly published versions may not be visible on every PyPI edge yet.
+          # pip's network retries do not retry "No matching distribution" errors.
+          for attempt in 1 2 3 4 5 6; do
+            if python -m pip install --no-cache-dir --timeout 30 --retries 2 "$LIB"; then
+              break
+            fi
+            if [ "$attempt" -eq 6 ]; then
+              echo "::error::Failed to install $LIB after $attempt attempts."
+              exit 1
+            fi
+            echo "::warning::Installation attempt $attempt failed; retrying in 30 seconds."
+            sleep 30
+          done
 
       - name: Run compatibility tests
         run: |

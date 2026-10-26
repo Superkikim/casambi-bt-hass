@@ -204,7 +204,7 @@ because it uses a name-mangled private attribute (`_unknown_controls`).
 
 ## 4. Casambi Library Version Notes
 
-- **Our fork uses:** `casambi-bt-skk==0.4.0b5.post1` (synchronized with the upstream `casambi-bt` development branch)
+- **Our fork uses:** `casambi-bt-skk==0.4.0b5.post2` (based on upstream `casambi-bt` development, with a disconnect callback ordering fix)
 - **lkempf:dev uses:** `casambi-bt==0.4.0b2` (lkempf's upstream library)
 
 These are **different forks** of the same library. Before rebasing on lkempf, the
